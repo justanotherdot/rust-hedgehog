@@ -35,7 +35,7 @@ mod tests {
     use lazy::Thunk;
 
     #[test]
-    fn it_works() {
+    fn it_defers_application_until_forced() {
         let t = Thunk::new(|| 5);
         let v = t.force();
         assert_eq!(v, 5);
