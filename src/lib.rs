@@ -13,15 +13,12 @@ pub mod lazy {
             }
         }
 
-        fn think(self) -> T {
-            (self._think)()
-        }
-
         pub fn force(mut self) -> T {
             match self._memo {
                 Some(v) => v,
                 None => {
-                    let rv = self.think();
+                    let think = self._think;
+                    let rv = think();
                     self._memo = Some(rv.clone());
                     rv
                 }
