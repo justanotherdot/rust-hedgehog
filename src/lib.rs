@@ -2,14 +2,14 @@ pub mod lazy {
     #[derive(Copy, Clone)]
     pub struct Thunk<T: Clone, F: FnOnce() -> T> {
         _think: F,
-        _val: Option<T>,
+        _memo: Option<T>,
     }
 
     impl<T: Clone, F: FnOnce() -> T> Thunk<T, F> {
         pub fn new(closure: F) -> Thunk<T, F> {
             Thunk {
                 _think: closure,
-                _val: None,
+                _memo: None,
             }
         }
 
@@ -18,11 +18,11 @@ pub mod lazy {
         }
 
         pub fn force(mut self) -> T {
-            match self._val {
+            match self._memo {
                 Some(v) => v,
                 None => {
                     let rv = self.think();
-                    self._val = Some(rv.clone());
+                    self._memo = Some(rv.clone());
                     rv
                 }
             }
