@@ -39,6 +39,8 @@ pub mod lazy {
         _cell: RefCell<Rc<Thunk<'a, Cell<'a, T>>>>
     }
 
+    impl <'a, T> Stream<'a, T> {
+    }
 }
 
 #[cfg(test)]
