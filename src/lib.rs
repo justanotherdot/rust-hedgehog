@@ -1,83 +1,118 @@
 pub mod lazy {
-    use std::rc::{Rc};
+    //use std::rc::Rc;
+    use std::cell::RefCell;
 
-    pub struct Thunk<T> {
-        _memo: Option<T>,
-        _think: Box<Fn() -> T>,
+    pub struct Thunk<'a, T> {
+        _thunk: RefCell<Option<T>>,
+        _think: Box<'a + Fn() -> T>,
     }
 
-    impl <T> Thunk<T> {
-        pub fn new(clsr: Box<Fn() -> T>) -> Thunk<T> {
+    impl <'a, T> Thunk<'a, T> {
+        pub fn new<F>(clsr: F) -> Thunk<'a, T> where F: 'a + Fn() -> T {
             Thunk {
-                _think: clsr,
-                _memo: None,
+                _think: Box::new(clsr),
+                _thunk: RefCell::new(None),
             }
         }
 
-        pub fn force(&mut self) -> &Option<T> {
-            match self._memo {
-                None => {
-                    let rv = (self._think)();
-                    self._memo = Some(rv);
-                }
-                _ => ()
+        pub fn force(self) -> Option<T> {
+            if self._thunk.borrow().is_none() {
+                let rv = (self._think)();
+                self._thunk.replace(Some(rv));
             }
-            &self._memo
+            self._thunk.into_inner()
         }
     }
 
-    pub struct Cell<T> {
-        _v: T,
-        _tail: Stream<T>,
-    }
+    //pub struct Cell<T> {
+        //pub head: T,
+        //tail: Stream<T>,
+    //}
 
-    impl <T> Cell<T> {
-        pub fn new(x: T, tail: Stream<T>) -> Cell<T> {
-            Cell {
-                _v: x,
-                _tail: tail,
-            }
-        }
+    //impl <T> Cell<T> {
+        //pub fn new(x: T, tail: Stream<T>) -> Cell<T> {
+            //Cell {
+                //head: x,
+                //tail: tail,
+            //}
+        //}
+    //}
 
-        pub fn head(self) -> T {
-            self._v
-        }
+    //pub struct Stream<T> {
+        //_cell: Rc<Thunk<Cell<T>>>
+    //}
 
-        pub fn tail(self) -> Stream<T> {
-            self._tail
-        }
-    }
+    //impl <T> Stream<T> {
+        //// TODO For finite lists.
+        ////pub fn empty() {
+            ////Stream {
+                ////_cell: None
+            ////}
+        ////}
 
-    pub struct Stream<T> {
-        _cell: Rc<Thunk<Cell<T>>>
-    }
+        //pub fn get(self) -> Option<T> {
+            //Rc::try_unwrap(self._cell)
+        //}
 
-    impl <T> Stream<T> {
-        pub fn new(self, f: Box<Fn() -> Cell<T>>) -> Stream<T> {
-            Stream {
-                _cell: Rc::new(Thunk::new(f))
-            }
-        }
-    }
+        //pub fn new(f: Box<Fn() -> Cell<T>>) -> Stream<T> {
+            //Stream {
+                //_cell: Rc::new(Thunk::new(f))
+            //}
+        //}
+    //}
+
+    //impl <T> Iterator for Stream<T> {
+        //type Item = Rc<Thunk<Cell<T>>>;
+
+        //fn next(&mut self) -> Option<Self::Item> {
+            //match Rc::try_unwrap(self._cell.clone()) {
+                //Ok(thunk) => {
+                    //match thunk.force() {
+                        //Some(cell) => {
+                            //self._cell = cell.tail._cell;
+                            //Some(self._cell.clone())
+                        //},
+                        //None => None
+                    //}
+                //},
+                //_ => None,
+            //}
+        //}
+    //}
 }
 
 #[cfg(test)]
 mod tests {
+    //use lazy::{Thunk, Cell, Stream};
     use lazy::Thunk;
     use std::time::SystemTime;
 
     #[test]
-    fn it_defers_application_until_forced() {
-        let mut t = Thunk::new(Box::new(|| 5));
-        let v = t.force().unwrap();
-        assert_eq!(v, 5);
+    fn thunks_defer_application_until_forced() {
+        let t = Thunk::new(|| 5);
+        let v = t.force();
+        assert_eq!(v, Some(5));
     }
 
     #[test]
-    fn it_memoizes_values() {
-        let mut t = Thunk::new(Box::new(|| SystemTime::now()));
+    fn thunks_memoize_values() {
+        let t = Thunk::new(|| SystemTime::now());
         let p = t.force().unwrap();
-        let q = t.force().unwrap();
+        let q = p;
         assert_eq!(p, q);
     }
+
+    //#[test]
+    //fn streams_are_lazy_and_infinite() {
+        //fn ints_from(n: usize) -> Stream<usize> {
+            //Stream::new(Box::new(move || Cell::new(n, ints_from(n+1))))
+        //}
+
+        //let mut strm = ints_from(5);
+        //let x = strm.next();
+        ////assert_eq!(strm.take(5).count(), 5);
+        ////for x in strm.iter().take(5) {
+            ////assert_eq!(x, x); // Not valid!
+        ////}
+    //}
 }
