@@ -26,6 +26,19 @@ pub mod lazy {
                 .unwrap()
         }
     }
+
+    pub struct Cell<'a, T> {
+        _v: T,
+        _tail: Stream<'a, T>,
+    }
+
+    impl <'a, T> Cell<'a, T> {
+    }
+
+    pub struct Stream<'a, T> {
+        _cell: RefCell<Rc<Thunk<'a, Cell<'a, T>>>>
+    }
+
 }
 
 #[cfg(test)]
