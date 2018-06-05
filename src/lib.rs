@@ -1,5 +1,7 @@
 pub mod lazy {
     use std::rc::Rc;
+    // TODO Consider using `Cell` instead of `RefCell`,
+    // TODO for static vs. runtime failures.
     use std::cell::RefCell;
 
     pub struct Thunk<'a, T> {
@@ -27,26 +29,112 @@ pub mod lazy {
         }
     }
 
+    #[derive(Clone)]
     pub struct Cell<'a, T> {
-        _v: T,
-        _tail: Stream<'a, T>,
+        _v: Option<T>,
+        _tail: Option<Stream<'a, T>>,
     }
 
-    impl <'a, T> Cell<'a, T> {
+    impl <'a, T: Clone> Cell<'a, T> {
+        pub fn empty() -> Cell<'a, T> {
+            Cell {
+                _v: None,
+                _tail: None,
+            }
+        }
+
+        pub fn new(v: T, tail: Stream<'a, T>) -> Cell<'a, T> {
+            Cell {
+                _v: Some(v),
+                _tail: Some(tail),
+            }
+        }
+
+        pub fn singleton(v: T) -> Cell<'a, T> {
+            Cell {
+                _v: Some(v),
+                _tail: None,
+            }
+        }
+
+        pub fn val(&self) -> Option<T> {
+            self._v.clone()
+        }
+
+        pub fn pop_front(self) -> Option<Stream<'a, T>> {
+            self._tail
+        }
     }
 
+    #[derive(Clone)]
     pub struct Stream<'a, T> {
-        _cell: RefCell<Rc<Thunk<'a, Cell<'a, T>>>>
+        // XXX Wow, this is a lot of angle brackets.
+        pub _cell: RefCell<Option<Rc<Thunk<'a, Cell<'a, T>>>>> // XXX Is only public for `from`.
     }
 
-    impl <'a, T> Stream<'a, T> {
+    impl <'a, T: Clone> Stream<'a, T> {
+        pub fn empty() -> Stream<'a, T> {
+            Stream {
+                _cell: RefCell::new(None),
+            }
+        }
+
+        pub fn new<F>(f: F) -> Stream<'a, T> where F: 'a + Fn() -> Cell<'a, T> {
+            Stream {
+                _cell: RefCell::new(Some(Rc::new(Thunk::new(f)))),
+            }
+        }
+
+        pub fn from(strm: Stream<'a, T>) -> Stream<'a, T> {
+            let rc = RefCell::new(strm._cell.into_inner());
+            Stream {
+                _cell: rc,
+            }
+        }
+
+        pub fn is_empty(&self) -> bool {
+            self._cell.borrow().is_none()
+        }
+
+        fn unwrap_cell(&self) -> Option<Cell<'a, T>> {
+            match self.clone()._cell.into_inner() {
+                Some(rc) => {
+                    let rc_ptr = Rc::into_raw(rc);
+                    let thunk = unsafe { &*rc_ptr } ;
+                    Some(thunk.force())
+                },
+                None => {
+                    println!("failed to unwrap Option");
+                    None
+                },
+            }
+        }
+
+        pub fn get(&self) -> Option<T> {
+            match self.unwrap_cell() {
+                Some(cell) => cell.val(),
+                None => None
+            }
+        }
+
+        pub fn pop_front(&self) -> Stream<'a, T> {
+            let old_strm =
+                match self.unwrap_cell() {
+                    Some(cell) => cell.pop_front(),
+                    None => None,
+                };
+            match old_strm {
+                Some(strm) => strm,
+                None => Stream::empty(),
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    //use lazy::{Thunk, Cell, Stream};
-    use lazy::Thunk;
+    use lazy::{Thunk, Cell, Stream};
+    //use lazy::Thunk;
     use std::time::SystemTime;
 
     #[test]
@@ -64,9 +152,45 @@ mod tests {
         assert_eq!(p, q);
     }
 
-    //#[test]
-    //fn lazy_cells_have_a_head_and_a_tail() {
-        //let cell = Cell::new(13, Stream::empty());
-        //let x:() = cell.head;
-    //}
+    #[test]
+    fn streams_are_lazy_and_possibly_infinite() {
+        fn ints_from<'a>(n: usize) -> Stream<'a, usize> {
+            Stream::new(move || Cell::new(n, ints_from(n+1)))
+        }
+
+        let mut strm = ints_from(5);
+        let mut i = 5;
+        loop {
+            if i > 10 {
+                break;
+            }
+
+            assert_eq!(strm.get(), Some(i));
+            i += 1;
+            strm = strm.pop_front();
+        }
+    }
+
+    #[test]
+    fn streams_are_lazy_and_possibly_finite() {
+        fn ints_from_to<'a>(n: usize, m: usize) -> Stream<'a, usize> {
+            if n > m {
+                return Stream::empty();
+            }
+            Stream::new(move || Cell::new(n, ints_from_to(n+1, m)))
+        }
+
+        let mut strm = ints_from_to(5, 7);
+        let mut i = 5;
+        loop {
+            if i > 7 {
+                assert_eq!(strm.get(), None);
+                break;
+            }
+
+            assert_eq!(strm.get(), Some(i));
+            i += 1;
+            strm = strm.pop_front();
+        }
+    }
 }
