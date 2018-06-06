@@ -62,7 +62,7 @@ pub mod lazy {
             self._v.clone()
         }
 
-        pub fn pop_front(self) -> Option<Stream<'a, T>> {
+        pub fn tail(self) -> Option<Stream<'a, T>> {
             self._tail
         }
     }
@@ -117,10 +117,10 @@ pub mod lazy {
             }
         }
 
-        pub fn pop_front(&self) -> Stream<'a, T> {
+        pub fn tail(&self) -> Stream<'a, T> {
             let old_strm =
                 match self.unwrap_cell() {
-                    Some(cell) => cell.pop_front(),
+                    Some(cell) => cell.tail(),
                     None => None,
                 };
             match old_strm {
@@ -138,7 +138,7 @@ pub mod lazy {
                 return None;
             }
             let curr = self.get();
-            self._cell.replace(self.pop_front()._cell.into_inner());
+            self._cell.replace(self.tail()._cell.into_inner());
             curr
         }
     }
@@ -180,7 +180,7 @@ mod tests {
 
             assert_eq!(strm.get(), Some(i));
             i += 1;
-            strm = strm.pop_front();
+            strm = strm.tail();
         }
     }
 
@@ -203,7 +203,7 @@ mod tests {
 
             assert_eq!(strm.get(), Some(i));
             i += 1;
-            strm = strm.pop_front();
+            strm = strm.tail();
         }
     }
 
