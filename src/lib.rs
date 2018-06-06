@@ -1,7 +1,8 @@
+//#![feature(test)]
+//extern crate test;
+
 pub mod lazy {
     use std::rc::Rc;
-    // TODO Consider using `Cell` instead of `RefCell`,
-    // TODO for static vs. runtime failures.
     use std::cell::RefCell;
 
     pub struct Thunk<'a, T> {
@@ -104,7 +105,6 @@ pub mod lazy {
                     Some(thunk.force())
                 },
                 None => {
-                    println!("failed to unwrap Option");
                     None
                 },
             }
@@ -129,13 +129,26 @@ pub mod lazy {
             }
         }
     }
+
+    impl <'a, T: Clone> Iterator for Stream<'a, T> {
+        type Item = T;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.is_empty() {
+                return None;
+            }
+            let curr = self.get();
+            self._cell.replace(self.pop_front()._cell.into_inner());
+            curr
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use lazy::{Thunk, Cell, Stream};
-    //use lazy::Thunk;
     use std::time::SystemTime;
+    //use test::Bencher;
 
     #[test]
     fn thunks_defer_application_until_forced() {
@@ -193,4 +206,81 @@ mod tests {
             strm = strm.pop_front();
         }
     }
+
+    #[test]
+    fn infinite_streams_impl_iterators() {
+        fn ints_from<'a>(n: usize) -> Stream<'a, usize> {
+            Stream::new(move || Cell::new(n, ints_from(n+1)))
+        }
+
+        let strm = ints_from(5);
+        let mut i = 5;
+        for x in strm {
+            if i > 100 {
+                break;
+            }
+
+            assert_eq!(x, i);
+            i += 1;
+        }
+    }
+
+    #[test]
+    fn finite_streams_impl_iterators() {
+        fn ints_from_to<'a>(n: usize, m: usize) -> Stream<'a, usize> {
+            if n > m {
+                return Stream::empty();
+            }
+            Stream::new(move || Cell::new(n, ints_from_to(n+1, m)))
+        }
+
+        let strm = ints_from_to(5, 7);
+        let mut i = 5;
+        for x in strm {
+            assert_eq!(x, i);
+            i += 1;
+        }
+    }
+
+    // Benchmarks.
+    // Can run via (after uncommenting benchmarks and feature flag at top of file):
+    //
+    // ```
+    //   $ rustup run nightly cargo bench
+    // ```
+
+    //#[bench]
+    //fn bench_infinite_streams(b: &mut Bencher) {
+        //fn ints_from<'a>(n: usize) -> Stream<'a, usize> {
+            //Stream::new(move || Cell::new(n, ints_from(n+1)))
+        //}
+
+        //let strm = ints_from(5);
+        //b.iter(move || {
+            //let mut i = 5;
+            //for _ in strm.clone() {
+                //if i > 100 {
+                    //break;
+                //}
+                //i += 1;
+            //}
+        //});
+    //}
+
+    //#[bench]
+    //fn bench_finite_streams(b: &mut Bencher) {
+        //fn ints_from_to<'a>(n: usize, m: usize) -> Stream<'a, usize> {
+            //if n > m {
+                //return Stream::empty();
+            //}
+            //Stream::new(move || Cell::new(n, ints_from_to(n+1, m)))
+        //}
+
+        //let strm = ints_from_to(5, 100);
+        //b.iter(|| {
+            //for _ in strm.clone() {
+                //continue;
+            //}
+        //});
+    //}
 }
