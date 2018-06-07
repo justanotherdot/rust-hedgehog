@@ -143,6 +143,11 @@ pub mod lazy {
             curr
         }
     }
+
+    pub struct Tree<'a, T> {
+        _v: T,
+        _children: Stream<'a, Tree<'a, T>>
+    }
 }
 
 #[cfg(test)]
