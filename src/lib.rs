@@ -31,28 +31,28 @@ pub mod lazy {
     }
 
     #[derive(Clone)]
-    pub struct Cell<'a, T> {
+    pub struct ConsCell<'a, T> {
         _v: Option<T>,
         _tail: Option<Stream<'a, T>>,
     }
 
-    impl <'a, T: Clone> Cell<'a, T> {
-        pub fn empty() -> Cell<'a, T> {
-            Cell {
+    impl <'a, T: Clone> ConsCell<'a, T> {
+        pub fn empty() -> ConsCell<'a, T> {
+            ConsCell {
                 _v: None,
                 _tail: None,
             }
         }
 
-        pub fn new(v: T, tail: Stream<'a, T>) -> Cell<'a, T> {
-            Cell {
+        pub fn new(v: T, tail: Stream<'a, T>) -> ConsCell<'a, T> {
+            ConsCell {
                 _v: Some(v),
                 _tail: Some(tail),
             }
         }
 
-        pub fn singleton(v: T) -> Cell<'a, T> {
-            Cell {
+        pub fn singleton(v: T) -> ConsCell<'a, T> {
+            ConsCell {
                 _v: Some(v),
                 _tail: None,
             }
@@ -70,7 +70,7 @@ pub mod lazy {
     #[derive(Clone)]
     pub struct Stream<'a, T> {
         // XXX Wow, this is a lot of angle brackets.
-        pub _cell: RefCell<Option<Rc<Thunk<'a, Cell<'a, T>>>>> // XXX Is only public for `from`.
+        _cell: RefCell<Option<Rc<Thunk<'a, ConsCell<'a, T>>>>>
     }
 
     impl <'a, T: Clone> Stream<'a, T> {
@@ -80,7 +80,7 @@ pub mod lazy {
             }
         }
 
-        pub fn new<F>(f: F) -> Stream<'a, T> where F: 'a + Fn() -> Cell<'a, T> {
+        pub fn new<F>(f: F) -> Stream<'a, T> where F: 'a + Fn() -> ConsCell<'a, T> {
             Stream {
                 _cell: RefCell::new(Some(Rc::new(Thunk::new(f)))),
             }
@@ -97,11 +97,12 @@ pub mod lazy {
             self._cell.borrow().is_none()
         }
 
-        fn unwrap_cell(&self) -> Option<Cell<'a, T>> {
+        fn unwrap_cell(&self) -> Option<ConsCell<'a, T>> {
             match self.clone()._cell.into_inner() {
-                Some(rc) => {
+                Some(rc) => unsafe {
                     let rc_ptr = Rc::into_raw(rc);
-                    let thunk = unsafe { &*rc_ptr } ;
+                    let thunk = &*rc_ptr;
+                    Rc::from_raw(rc_ptr);
                     Some(thunk.force())
                 },
                 None => {
@@ -146,7 +147,7 @@ pub mod lazy {
 
 #[cfg(test)]
 mod tests {
-    use lazy::{Thunk, Cell, Stream};
+    use lazy::{Thunk, ConsCell, Stream};
     use std::time::SystemTime;
     //use test::Bencher;
 
@@ -168,7 +169,7 @@ mod tests {
     #[test]
     fn streams_are_lazy_and_possibly_infinite() {
         fn ints_from<'a>(n: usize) -> Stream<'a, usize> {
-            Stream::new(move || Cell::new(n, ints_from(n+1)))
+            Stream::new(move || ConsCell::new(n, ints_from(n+1)))
         }
 
         let mut strm = ints_from(5);
@@ -190,7 +191,7 @@ mod tests {
             if n > m {
                 return Stream::empty();
             }
-            Stream::new(move || Cell::new(n, ints_from_to(n+1, m)))
+            Stream::new(move || ConsCell::new(n, ints_from_to(n+1, m)))
         }
 
         let mut strm = ints_from_to(5, 7);
@@ -210,7 +211,7 @@ mod tests {
     #[test]
     fn infinite_streams_impl_iterators() {
         fn ints_from<'a>(n: usize) -> Stream<'a, usize> {
-            Stream::new(move || Cell::new(n, ints_from(n+1)))
+            Stream::new(move || ConsCell::new(n, ints_from(n+1)))
         }
 
         let strm = ints_from(5);
@@ -231,7 +232,7 @@ mod tests {
             if n > m {
                 return Stream::empty();
             }
-            Stream::new(move || Cell::new(n, ints_from_to(n+1, m)))
+            Stream::new(move || ConsCell::new(n, ints_from_to(n+1, m)))
         }
 
         let strm = ints_from_to(5, 7);
@@ -252,7 +253,7 @@ mod tests {
     //#[bench]
     //fn bench_infinite_streams(b: &mut Bencher) {
         //fn ints_from<'a>(n: usize) -> Stream<'a, usize> {
-            //Stream::new(move || Cell::new(n, ints_from(n+1)))
+            //Stream::new(move || ConsCell::new(n, ints_from(n+1)))
         //}
 
         //let strm = ints_from(5);
@@ -273,7 +274,7 @@ mod tests {
             //if n > m {
                 //return Stream::empty();
             //}
-            //Stream::new(move || Cell::new(n, ints_from_to(n+1, m)))
+            //Stream::new(move || ConsCell::new(n, ints_from_to(n+1, m)))
         //}
 
         //let strm = ints_from_to(5, 100);
