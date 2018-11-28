@@ -1,29 +1,26 @@
-//#![feature(test)]
-//extern crate test;
-
 pub mod lazy {
     use std::rc::Rc;
     use std::cell::RefCell;
 
     pub struct Thunk<'a, T> {
-        _thunk: RefCell<Option<T>>,
-        _think: Box<'a + Fn() -> T>,
+        thunk: RefCell<Option<T>>,
+        think: Box<'a + Fn() -> T>,
     }
 
     impl <'a, T: Clone> Thunk<'a, T> {
         pub fn new<F>(clsr: F) -> Thunk<'a, T> where F: 'a + Fn() -> T {
             Thunk {
-                _think: Box::new(clsr),
-                _thunk: RefCell::new(None),
+                think: Box::new(clsr),
+                thunk: RefCell::new(None),
             }
         }
 
         pub fn force(&self) -> T {
-            if self._thunk.borrow().is_none() {
-                let rv = (self._think)();
-                self._thunk.replace(Some(rv));
+            if self.thunk.borrow().is_none() {
+                let rv = (self.think)();
+                self.thunk.replace(Some(rv));
             }
-            self._thunk
+            self.thunk
                 .clone()
                 .into_inner()
                 .unwrap()
@@ -32,73 +29,73 @@ pub mod lazy {
 
     #[derive(Clone)]
     pub struct ConsCell<'a, T> {
-        _v: Option<T>,
-        _tail: Option<Stream<'a, T>>,
+        v: Option<T>,
+        tail: Option<Stream<'a, T>>,
     }
 
     impl <'a, T: Clone> ConsCell<'a, T> {
         pub fn empty() -> ConsCell<'a, T> {
             ConsCell {
-                _v: None,
-                _tail: None,
+                v: None,
+                tail: None,
             }
         }
 
         pub fn new(v: T, tail: Stream<'a, T>) -> ConsCell<'a, T> {
             ConsCell {
-                _v: Some(v),
-                _tail: Some(tail),
+                v: Some(v),
+                tail: Some(tail),
             }
         }
 
         pub fn singleton(v: T) -> ConsCell<'a, T> {
             ConsCell {
-                _v: Some(v),
-                _tail: None,
+                v: Some(v),
+                tail: None,
             }
         }
 
         pub fn val(&self) -> Option<T> {
-            self._v.clone()
+            self.v.clone()
         }
 
         pub fn tail(self) -> Option<Stream<'a, T>> {
-            self._tail
+            self.tail
         }
     }
 
     #[derive(Clone)]
     pub struct Stream<'a, T> {
         // XXX Wow, this is a lot of angle brackets.
-        _cell: RefCell<Option<Rc<Thunk<'a, ConsCell<'a, T>>>>>
+        cell: RefCell<Option<Rc<Thunk<'a, ConsCell<'a, T>>>>>
     }
 
     impl <'a, T: Clone> Stream<'a, T> {
         pub fn empty() -> Stream<'a, T> {
             Stream {
-                _cell: RefCell::new(None),
+                cell: RefCell::new(None),
             }
         }
 
         pub fn new<F>(f: F) -> Stream<'a, T> where F: 'a + Fn() -> ConsCell<'a, T> {
             Stream {
-                _cell: RefCell::new(Some(Rc::new(Thunk::new(f)))),
+                cell: RefCell::new(Some(Rc::new(Thunk::new(f)))),
             }
         }
 
         pub fn from(strm: Stream<'a, T>) -> Stream<'a, T> {
-            let rc = RefCell::new(strm._cell.into_inner());
+            let rc = RefCell::new(strm.cell.into_inner());
             Stream {
-                _cell: rc,
+                cell: rc,
             }
         }
 
         pub fn is_empty(&self) -> bool {
-            self._cell.borrow().is_none()
+            self.cell.borrow().is_none()
         }
 
         fn unwrap_cell(&self) -> Option<ConsCell<'a, T>> {
-            match self.clone()._cell.into_inner() {
+            match self.clone().cell.into_inner() {
                 Some(rc) => unsafe {
                     let rc_ptr = Rc::into_raw(rc);
                     let thunk = &*rc_ptr;
@@ -139,14 +136,14 @@ pub mod lazy {
                 return None;
             }
             let curr = self.get();
-            self._cell.replace(self.tail()._cell.into_inner());
+            self.cell.replace(self.tail().cell.into_inner());
             curr
         }
     }
 
     pub struct Tree<'a, T> {
-        _v: T,
-        _children: Stream<'a, Tree<'a, T>>
+        v: T,
+        children: Stream<'a, Tree<'a, T>>
     }
 }
 
