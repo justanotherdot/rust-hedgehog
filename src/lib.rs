@@ -1,6 +1,6 @@
 pub mod lazy {
     pub struct Thunk<'a, T> {
-        pub value: Option<T>,
+        value: Option<T>,
         closure: Box<'a + Fn() -> T>,
     }
 
@@ -15,17 +15,21 @@ pub mod lazy {
             }
         }
 
-        pub fn force(&mut self) -> &mut Self {
+        pub fn force(&mut self) -> &Self {
             if self.value.is_none() {
                 self.value = Some((self.closure)());
             }
             self
         }
+
+        pub fn value(&self) -> &T {
+            &self.value.as_ref().unwrap()
+        }
     }
 
     #[allow(dead_code)]
     pub struct Tree<'a, T> {
-        pub thunk: Thunk<'a, T>,
+        thunk: Thunk<'a, T>,
         children: Vec<Tree<'a, T>>,
     }
 
@@ -35,6 +39,10 @@ pub mod lazy {
                 thunk: Thunk::new(move || value.clone()),
                 children: vec![],
             }
+        }
+
+        pub fn value(&mut self) -> &T {
+            self.thunk.force().value()
         }
     }
 }
@@ -47,23 +55,25 @@ mod tests {
     #[test]
     fn thunks_defer_application_until_forced() {
         let mut t = Thunk::new(|| SystemTime::now());
-        let v = t.force().value;
-        assert!(v != Some(SystemTime::now()));
+        let v = t.force().value();
+        assert!(*v != SystemTime::now());
     }
 
     #[test]
     fn thunks_memoize_values() {
-        let mut t = Thunk::new(|| SystemTime::now());
-        let p = t.force().value;
-        let q = t.force().value;
-        assert_eq!(p, q);
+        let n = 42;
+        let mut t = Thunk::new(|| n);
+        t.force();
+        t.force();
+        assert_eq!(*t.value(), n);
     }
 
     #[test]
     fn rose_trees_hold_lazy_values() {
-        let mut tree = Tree::singleton(42);
-        let p = tree.thunk.force().value;
-        let q = tree.thunk.force().value;
-        assert_eq!(p, q);
+        let n = 42;
+        let mut tree = Tree::singleton(n);
+        tree.value();
+        tree.value();
+        assert_eq!(*tree.value(), n);
     }
 }
