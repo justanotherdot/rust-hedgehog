@@ -15,7 +15,7 @@ impl<'a, T: 'a + Clone> Tree<'a, T> {
     }
 
     pub fn value(&mut self) -> &T {
-        self.thunk.force().value()
+        self.thunk.value()
     }
 }
 

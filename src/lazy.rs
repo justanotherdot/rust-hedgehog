@@ -14,15 +14,15 @@ impl<'a, T: Clone> Lazy<'a, T> {
         }
     }
 
-    pub fn force(&mut self) -> &Self {
+    fn force(&mut self) -> &T {
         if self.value.is_none() {
             self.value = Some((self.closure)());
         }
-        self
+        &self.value.as_ref().unwrap()
     }
 
-    pub fn value(&self) -> &T {
-        &self.value.as_ref().unwrap()
+    pub fn value(&mut self) -> &T {
+        self.force()
     }
 }
 
@@ -34,7 +34,7 @@ mod tests {
     #[test]
     fn lazy_defer_application_until_forced() {
         let mut t = Lazy::new(|| SystemTime::now());
-        let v = t.force().value();
+        let v = t.value();
         assert!(*v != SystemTime::now());
     }
 
@@ -42,8 +42,8 @@ mod tests {
     fn lazy_memoize_values() {
         let n = 42;
         let mut t = Lazy::new(|| n);
-        t.force();
-        t.force();
+        t.value();
+        t.value();
         assert_eq!(*t.value(), n);
     }
 }
