@@ -1,15 +1,15 @@
-use lazy::Thunk;
+use lazy::Lazy;
 
 #[allow(dead_code)]
 pub struct Tree<'a, T> {
-    thunk: Thunk<'a, T>,
+    thunk: Lazy<'a, T>,
     children: Vec<Tree<'a, T>>,
 }
 
 impl<'a, T: 'a + Clone> Tree<'a, T> {
     pub fn singleton(value: T) -> Tree<'a, T> {
         Tree {
-            thunk: Thunk::new(move || value.clone()),
+            thunk: Lazy::new(move || value.clone()),
             children: vec![],
         }
     }
