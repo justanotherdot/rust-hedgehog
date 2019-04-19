@@ -75,7 +75,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn towards_shrinks() {
+    fn towards_works() {
         let f = towards(3);
         assert_eq!(f(100), vec![3, 51, 76, 88, 94, 97, 99]);
     }
