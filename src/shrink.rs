@@ -9,19 +9,13 @@ fn cons_nub<'a, A: 'a>(x: A) -> Box<Fn(Vec<A>) -> Vec<A> + 'a>
 where
     A: Num + FromPrimitive + Copy,
 {
-    let cons_nub_do = move |ys0: Vec<A>| {
-        let mut ys1 = ys0.clone();
-        if ys1.is_empty() {
-            vec![]
-        } else {
-            let y = ys1.remove(0);
-            if x == y {
-                ys0
-            } else {
-                ys1.insert(0, y);
-                ys1.insert(0, x);
-                ys1
-            }
+    let cons_nub_do = move |ys0: Vec<A>| match ys0.first() {
+        None => vec![],
+        Some(&y) if x == y => ys0,
+        Some(_) => {
+            let mut ys1 = ys0.clone();
+            ys1.insert(0, x);
+            ys1
         }
     };
     Box::new(cons_nub_do)
