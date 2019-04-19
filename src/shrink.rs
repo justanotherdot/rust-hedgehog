@@ -28,10 +28,10 @@ where
 }
 
 // TODO: This function needs testing and verification.
-fn unfoldr<A, B>(f: Box<Fn(B) -> Option<(A, B)>>, b0: B) -> Vec<A> {
+fn unfold<A, B>(f: Box<Fn(B) -> Option<(A, B)>>, b0: B) -> Vec<A> {
     match f(b0) {
         Some((a, b1)) => {
-            let mut v = unfoldr(f, b1);
+            let mut v = unfold(f, b1);
             v.insert(0, a); // XXX Always shifts values over on each fn call.
             v
         }
@@ -54,7 +54,7 @@ where
             Some((x0, x1))
         }
     };
-    unfoldr(Box::new(go), n)
+    unfold(Box::new(go), n)
 }
 
 #[allow(dead_code)]
