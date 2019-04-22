@@ -1,12 +1,12 @@
-pub struct Lazy<'a, T> {
-    value: Option<T>,
-    closure: Box<'a + Fn() -> T>,
+pub struct Lazy<'a, A> {
+    value: Option<A>,
+    closure: Box<'a + Fn() -> A>,
 }
 
-impl<'a, T: Clone> Lazy<'a, T> {
-    pub fn new<F>(closure: F) -> Lazy<'a, T>
+impl<'a, A: Clone> Lazy<'a, A> {
+    pub fn new<F>(closure: F) -> Lazy<'a, A>
     where
-        F: 'a + Fn() -> T,
+        F: 'a + Fn() -> A,
     {
         Lazy {
             closure: Box::new(closure),
@@ -14,14 +14,14 @@ impl<'a, T: Clone> Lazy<'a, T> {
         }
     }
 
-    fn force(&mut self) -> &T {
+    fn force(&mut self) -> &A {
         if self.value.is_none() {
             self.value = Some((self.closure)());
         }
         &self.value.as_ref().unwrap()
     }
 
-    pub fn value(&mut self) -> &T {
+    pub fn value(&mut self) -> &A {
         self.force()
     }
 }

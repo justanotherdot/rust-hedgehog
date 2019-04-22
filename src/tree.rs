@@ -1,27 +1,36 @@
 use lazy::Lazy;
 
-#[allow(dead_code)]
-pub struct Tree<'a, T> {
-    thunk: Lazy<'a, T>,
-    children: Vec<Tree<'a, T>>,
+pub struct Tree<'a, A> {
+    thunk: Lazy<'a, A>,
+    children: Vec<Tree<'a, A>>,
 }
 
-impl<'a, T: 'a + Clone> Tree<'a, T> {
-    pub fn singleton(value: T) -> Tree<'a, T> {
+impl<'a, A: 'a + Clone> Tree<'a, A> {
+    pub fn singleton(value: A) -> Tree<'a, A> {
         Tree {
             thunk: Lazy::new(move || value.clone()),
             children: vec![],
         }
     }
 
-    pub fn value(&mut self) -> &T {
+    pub fn value(&mut self) -> &A {
         self.thunk.value()
+    }
+}
+
+pub fn render<'a, A>(root: &mut Tree<'a, A>)
+where
+    A: Clone + std::fmt::Debug + 'a,
+{
+    print!("\"{:?}\"", &mut root.value());
+    for child in root.children.iter_mut() {
+        render(child);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use tree::Tree;
+    use super::*;
 
     #[test]
     fn rose_trees_hold_lazy_values() {
@@ -30,5 +39,12 @@ mod tests {
         tree.value();
         tree.value();
         assert_eq!(*tree.value(), n);
+    }
+
+    #[test]
+    fn trees_get_rendered() {
+        let mut tree = Tree::singleton(3);
+        tree.children = vec![Tree::singleton(5)];
+        render(&mut tree);
     }
 }
