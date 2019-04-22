@@ -18,16 +18,6 @@ impl<'a, A: 'a + Clone> Tree<'a, A> {
     }
 }
 
-pub fn render<'a, A>(root: &mut Tree<'a, A>)
-where
-    A: Clone + std::fmt::Debug + 'a,
-{
-    print!("\"{:?}\"", &mut root.value());
-    for child in root.children.iter_mut() {
-        render(child);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -39,12 +29,5 @@ mod tests {
         tree.value();
         tree.value();
         assert_eq!(*tree.value(), n);
-    }
-
-    #[test]
-    fn trees_get_rendered() {
-        let mut tree = Tree::singleton(3);
-        tree.children = vec![Tree::singleton(5)];
-        render(&mut tree);
     }
 }
