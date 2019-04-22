@@ -54,21 +54,23 @@ where
 
 #[allow(dead_code)]
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, A: 'a>(destination: A) -> Box<Fn(A) -> Vec<A> + 'a>
+pub fn towards<'a, A: 'a>(destination: A) -> impl Fn(A) -> Vec<A>
 where
-    A: Num + FromPrimitive + Copy,
+    A: Integer + FromPrimitive + Copy,
 {
     let towards_do = move |x: A| {
         if destination == x {
             Vec::new()
         } else {
+            // We need to halve our operands before subtracting them as they may be using
+            // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
             let two = FromPrimitive::from_isize(2).unwrap();
             let diff = (x / two) - (destination / two);
 
             cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
         }
     };
-    Box::new(towards_do)
+    towards_do
 }
 
 #[cfg(test)]
