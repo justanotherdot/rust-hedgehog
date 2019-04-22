@@ -100,7 +100,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use crate::*;
 
     #[test]
     fn towards_works() {
