@@ -1,13 +1,13 @@
 extern crate num;
 
-use self::num::{FromPrimitive, Num};
+use self::num::{FromPrimitive, Integer};
 
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
 // pipeline a la the F# port.
 fn cons_nub<'a, A: 'a>(x: A) -> Box<Fn(Vec<A>) -> Vec<A> + 'a>
 where
-    A: Num + FromPrimitive + Copy,
+    A: Integer + FromPrimitive + Copy,
 {
     let cons_nub_do = move |ys0: Vec<A>| match ys0.first() {
         None => vec![],
@@ -22,6 +22,7 @@ where
 }
 
 // TODO: This function needs testing and verification.
+// TODO: This function could just be a loop.
 fn unfold<A, B>(f: Box<Fn(B) -> Option<(A, B)>>, b0: B) -> Vec<A> {
     match f(b0) {
         Some((a, b1)) => {
@@ -36,7 +37,7 @@ fn unfold<A, B>(f: Box<Fn(B) -> Option<(A, B)>>, b0: B) -> Vec<A> {
 #[allow(dead_code)]
 pub fn halves<A>(n: A) -> Vec<A>
 where
-    A: Num + FromPrimitive + Copy,
+    A: Integer + FromPrimitive + Copy,
 {
     let go = |x0| {
         let zero = num::zero();
