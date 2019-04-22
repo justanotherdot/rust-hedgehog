@@ -1,27 +1,26 @@
 use lazy::Lazy;
 
-#[allow(dead_code)]
-pub struct Tree<'a, T> {
-    thunk: Lazy<'a, T>,
-    children: Vec<Tree<'a, T>>,
+pub struct Tree<'a, A> {
+    thunk: Lazy<'a, A>,
+    children: Vec<Tree<'a, A>>,
 }
 
-impl<'a, T: 'a + Clone> Tree<'a, T> {
-    pub fn singleton(value: T) -> Tree<'a, T> {
+impl<'a, A: 'a + Clone> Tree<'a, A> {
+    pub fn singleton(value: A) -> Tree<'a, A> {
         Tree {
             thunk: Lazy::new(move || value.clone()),
             children: vec![],
         }
     }
 
-    pub fn value(&mut self) -> &T {
+    pub fn value(&mut self) -> &A {
         self.thunk.value()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use tree::Tree;
+    use super::*;
 
     #[test]
     fn rose_trees_hold_lazy_values() {
