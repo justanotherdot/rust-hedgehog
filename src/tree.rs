@@ -2,6 +2,7 @@ use lazy::Lazy;
 
 pub struct Tree<'a, A> {
     thunk: Lazy<'a, A>,
+    #[allow(dead_code)]
     children: Vec<Tree<'a, A>>,
 }
 
