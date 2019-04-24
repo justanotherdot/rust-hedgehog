@@ -1,11 +1,23 @@
-extern crate num;
+use num::{Bounded, FromPrimitive, Integer, Num};
 
-use self::num::{Bounded, FromPrimitive, Num};
-
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-pub struct Size {
-    un_size: isize,
-}
+//#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Num)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Eq,
+    Ord,
+    PartialEq,
+    PartialOrd,
+    ToPrimitive,
+    FromPrimitive,
+    NumOps,
+    NumCast,
+    One,
+    Zero,
+    Num,
+)]
+pub struct Size(isize);
 
 pub struct Range<'a, A: 'a>(A, Box<Fn(Size) -> (A, A) + 'a>);
 
@@ -85,6 +97,68 @@ where
         Bounded::min_value(),
         Bounded::max_value(),
     )
+}
+
+pub fn linear<'a, A>(x: A, y: A) -> Range<'a, A>
+where
+    A: Integer + Clone + FromPrimitive,
+{
+    linear_from(x.clone(), x, y)
+}
+
+pub fn linear_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
+where
+    A: Integer + Clone + FromPrimitive,
+{
+    Range(
+        z.clone(),
+        Box::new(move |sz| {
+            let x_sized = clamp(
+                x.clone(),
+                y.clone(),
+                scale_linear(sz.clone(), z.clone(), x.clone()),
+            );
+            let y_sized = clamp(
+                x.clone(),
+                y.clone(),
+                scale_linear(sz.clone(), z.clone(), y.clone()),
+            );
+
+            (x_sized, y_sized)
+        }),
+    )
+}
+
+pub fn linear_bounded<'a, A>() -> Range<'a, A>
+where
+    A: Bounded + Integer + Clone + FromPrimitive,
+{
+    let zero = FromPrimitive::from_isize(0).unwrap();
+    linear_from(zero, A::min_value(), A::max_value())
+}
+
+pub fn clamp<'a, A>(x: A, y: A, n: A) -> A
+where
+    A: Ord,
+{
+    if x > y {
+        std::cmp::min(x, std::cmp::max(y, n))
+    } else {
+        std::cmp::min(y, std::cmp::max(x, n))
+    }
+}
+
+pub fn scale_linear<'a, A>(sz0: Size, z0: A, n0: A) -> A
+where
+    A: Integer + FromPrimitive + Clone,
+{
+    let zero = FromPrimitive::from_isize(0).unwrap();
+    let ninety_nine_sz = FromPrimitive::from_isize(99).unwrap();
+    let sz = std::cmp::max(zero, std::cmp::min(ninety_nine_sz, sz0));
+    let sz1 = FromPrimitive::from_isize(sz.0).unwrap();
+    let ninety_nine: A = FromPrimitive::from_isize(99).unwrap();
+    let (diff, _) = Integer::div_rem(&((n0 - z0.clone()) * sz1), &ninety_nine);
+    z0 + diff
 }
 
 #[cfg(test)]
