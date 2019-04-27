@@ -1,3 +1,7 @@
+#[macro_use]
+extern crate num_derive;
+extern crate num;
+
 pub mod gen;
 pub mod lazy;
 pub mod range;
