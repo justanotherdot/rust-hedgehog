@@ -1,4 +1,5 @@
 use rand::distributions::{Distribution, Uniform};
+use rand::*;
 use rand_core::{impls, RngCore};
 
 const GOLDEN_GAMMA: u64 = 0x9e3779b97f4a7c15;
@@ -9,21 +10,16 @@ pub struct Seed {
     gamma: u64,
 }
 
-// TODO
+#[inline(never)]
 pub fn global() -> Seed {
-    // Use /dev/urandom on linux
-    // otherwise get POSIX time
-    let value = 0;
-    let gamma = 0;
-    Seed { value, gamma }
+    let mut rng = rand::thread_rng();
+    from(rng.gen())
 }
 
-// TODO
 pub fn random() -> Seed {
     split(global())
 }
 
-// TODO
 pub fn from(x: u64) -> Seed {
     let value = mix64(x);
     let gamma = mix_gamma(x + GOLDEN_GAMMA);
@@ -53,9 +49,8 @@ pub fn next_word32(s0: Seed) -> (u32, Seed) {
     (mix32(v0 as u32), s1)
 }
 
-// TODO Should this be BigInt?
+// XXX Should this be BigInt?
 pub fn next_integer(lo: isize, hi: isize, mut s0: Seed) -> (isize, Seed) {
-    // Could use lo..hi.into()
     let v = Uniform::from(lo..hi).sample(&mut s0);
     (v, s0)
 }
