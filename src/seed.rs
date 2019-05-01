@@ -73,6 +73,7 @@ pub fn mix64(x: u64) -> u64 {
 }
 
 #[allow(overflowing_literals)]
+#[allow(exceeding_bitshifts)]
 pub fn mix32(x: u32) -> u32 {
     let y = (x ^ (x >> 33)) * 0xff51afd7ed558ccd;
     let z = (y ^ (y >> 33)) * 0xc4ceb9fe1a85ec53;
