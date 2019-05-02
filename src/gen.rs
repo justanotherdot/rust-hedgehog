@@ -4,7 +4,12 @@ use crate::tree::Tree;
 
 pub struct Gen<'a, A> {
     #[allow(dead_code)]
-    un_gen: Fn(Size, Seed) -> Tree<'a, Option<A>>,
+    un_gen: Box<Fn(Size, Seed) -> Tree<'a, Option<A>>>,
+}
+
+pub fn run_gen<'a, A>(size: Size, seed: Seed, gen: Gen<'a, A>) -> Tree<'a, Option<A>> {
+    let f = gen.un_gen;
+    f(size, seed)
 }
 
 #[cfg(test)]
