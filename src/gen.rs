@@ -10,8 +10,12 @@ pub struct Gen<'a, A>(#[allow(dead_code)] Box<Fn(Size, Seed) -> Tree<'a, A>>);
 // repr. between all three that makes sense to Rusts strengths.
 type Random<'a, A> = Box<Fn(Size, Seed) -> A>;
 
-pub fn of_random<'a, A>(r: Random<Tree<'a, A>>) -> Gen<'a, A> {
+pub fn from_random<'a, A>(r: Random<Tree<'a, A>>) -> Gen<'a, A> {
     Gen(r)
+}
+
+pub fn to_random<'a, A>(g: Gen<'a, A>) -> Random<Tree<'a, A>> {
+    g.0
 }
 
 #[cfg(test)]
