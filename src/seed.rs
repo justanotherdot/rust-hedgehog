@@ -113,7 +113,7 @@ impl RngCore for Seed {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn stub() {

@@ -2,19 +2,21 @@ use crate::range::Size;
 use crate::seed::Seed;
 use crate::tree::Tree;
 
-pub struct Gen<'a, A> {
-    #[allow(dead_code)]
-    un_gen: Box<Fn(Size, Seed) -> Tree<'a, Option<A>>>,
-}
+pub struct Gen<'a, A>(#[allow(dead_code)] Box<Fn(Size, Seed) -> Tree<'a, A>>);
 
-pub fn run_gen<'a, A>(size: Size, seed: Seed, gen: Gen<'a, A>) -> Tree<'a, Option<A>> {
-    let f = gen.un_gen;
-    f(size, seed)
+// TODO I've used the F# naming here with the ctor `Random`
+// each impl (R, F#, and Haskell) differs in little ways
+// between each gen module so I'm trying to find a consistent
+// repr. between all three that makes sense to Rusts strengths.
+type Random<'a, A> = Box<Fn(Size, Seed) -> A>;
+
+pub fn of_random<'a, A>(r: Random<Tree<'a, A>>) -> Gen<'a, A> {
+    Gen(r)
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn stub_for_gen() {
