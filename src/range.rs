@@ -17,7 +17,7 @@ use num::{Bounded, Float, FromPrimitive, Integer, Num, ToPrimitive};
     Zero,
     Num,
 )]
-pub struct Size(isize);
+pub struct Size(pub isize);
 
 pub struct Range<'a, A: 'a>(A, Box<Fn(Size) -> (A, A) + 'a>);
 

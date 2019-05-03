@@ -1,5 +1,6 @@
 use crate::random;
 use crate::random::Random;
+use crate::tree;
 use crate::tree::Tree;
 
 pub struct Gen<'a, A>(#[allow(dead_code)] Random<'a, Tree<'a, A>>);
@@ -18,6 +19,16 @@ where
 {
     let delayed_rnd = random::delay(Box::new(move || to_random(f())));
     from_random(delayed_rnd)
+}
+
+pub fn create<'a, A>(shrink: Box<Fn(A) -> Vec<A>>, random: Random<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'static,
+{
+    from_random(random::map(
+        tree::unfold(Box::new(move |x| x), shrink),
+        random,
+    ))
 }
 
 #[cfg(test)]

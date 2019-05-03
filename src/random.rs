@@ -11,11 +11,23 @@ pub fn unsafe_run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
     r(seed, size)
 }
 
+pub fn run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
+    unsafe_run(seed, size.max(Size(1)), r)
+}
+
 pub fn delay<'a, A>(f: Box<Fn() -> Random<'a, A> + 'a>) -> Random<'a, A>
 where
     A: 'a,
 {
     Box::new(move |seed, size| unsafe_run(seed, size, f()))
+}
+
+pub fn map<'a, A, B>(f: Box<Fn(A) -> B>, r: Random<'a, A>) -> Random<'a, B>
+where
+    A: 'a,
+    B: 'a,
+{
+    Box::new(move |seed, size| f(unsafe_run(seed, size, r)))
 }
 
 #[cfg(test)]
