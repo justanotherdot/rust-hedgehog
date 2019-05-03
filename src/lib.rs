@@ -6,6 +6,7 @@ extern crate rand_core;
 
 pub mod gen;
 pub mod lazy;
+pub mod random;
 pub mod range;
 pub mod seed;
 pub mod shrink;
