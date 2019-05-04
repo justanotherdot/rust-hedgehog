@@ -20,19 +20,18 @@ impl<'a, A: 'a + Clone> Tree<'a, A> {
 }
 
 /// Build a tree from an unfolding function and a seed value.
-pub fn unfold<'a, A, B>(
-    f: &'a Box<Fn(B) -> A>,
-    g: &'a Box<Fn(B) -> Vec<B>>,
-) -> Box<Fn(B) -> Tree<'a, A> + 'a>
+pub fn unfold<'a, A, B, F, G>(f: &'a Box<F>, g: &'a Box<G>) -> Box<Fn(B) -> Tree<'a, A> + 'a>
 where
     A: Clone + 'a,
     B: Clone + 'a,
+    F: Fn(B) -> A,
+    G: Fn(B) -> &'a [B],
 {
     // This is a bit horrific.
     // We should probably change this unfold into something
     // iterative (non-recursive) as to avoid this nightmare.
     // It may also be worth exploring the use of FnBox, instead.
-    Box::new(move |x| {
+    Box::new(move |x: B| {
         let y = f(x.clone());
         Tree {
             thunk: Lazy::new(move || y.clone()),
@@ -42,14 +41,12 @@ where
 }
 
 /// Build a list of trees from an unfolding function and a seed value.
-pub fn unfold_forest<'a, A, B>(
-    f: &'a Box<Fn(B) -> A>,
-    g: &'a Box<Fn(B) -> Vec<B>>,
-    x: B,
-) -> Vec<Tree<'a, A>>
+pub fn unfold_forest<'a, A, B, F, G>(f: &'a Box<F>, g: &'a Box<G>, x: B) -> Vec<Tree<'a, A>>
 where
     A: Clone + 'a,
     B: Clone + 'a,
+    F: Fn(B) -> A,
+    G: Fn(B) -> &'a [B],
 {
     g(x).iter().map(move |v| unfold(f, g)(v.clone())).collect()
 }

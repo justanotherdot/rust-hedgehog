@@ -21,16 +21,13 @@ where
     from_random(delayed_rnd)
 }
 
-fn identity<A>(x: A) -> A {
-    x
-}
-
-pub fn create<'a, A>(shrink: Box<Fn(A) -> Vec<A> + 'static>, random: Random<'a, A>) -> Gen<'a, A>
+pub fn create<'a, A, F>(shrink: Box<F>, random: Random<A>) -> Gen<A>
 where
-    A: Clone + 'static,
+    A: Clone + 'a,
+    F: Fn(A) -> &'a [A],
 {
     from_random(random::map(
-        tree::unfold(&Box::new(identity) as &Box<Fn(A) -> A>, &shrink),
+        tree::unfold(&Box::new(move |x| x), &shrink),
         random,
     ))
 }
