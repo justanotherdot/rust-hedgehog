@@ -22,7 +22,10 @@ where
     Box::new(move |seed, size| unsafe_run(seed, size, f()))
 }
 
-pub fn map<A, B>(_f: Box<Fn(A) -> B>, _r: Random<A>) -> Random<B> {
+pub fn map<A, B, F>(_f: F, _r: Random<A>) -> Random<B>
+where
+    F: Fn(A) -> B,
+{
     unimplemented!()
     //Box::new(move |seed, size| f(unsafe_run(seed, size, r)))
 }

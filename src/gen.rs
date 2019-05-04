@@ -21,13 +21,13 @@ where
     from_random(delayed_rnd)
 }
 
-pub fn create<'a, A, F>(shrink: Box<F>, random: Random<A>) -> Gen<A>
+pub fn create<'a, A, F>(shrink: &'a Box<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
     F: Fn(A) -> &'a [A],
 {
     from_random(random::map(
-        tree::unfold(&Box::new(move |x| x), &shrink),
+        tree::unfold(&Box::new(move |x| x), shrink),
         random,
     ))
 }
