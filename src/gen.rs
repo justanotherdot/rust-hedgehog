@@ -21,15 +21,24 @@ where
     from_random(delayed_rnd)
 }
 
-pub fn create<'a, A, F>(shrink: &'a Box<F>, random: Random<'a, A>) -> Gen<'a, A>
+fn identity<A>(x: A) -> A {
+    x
+}
+
+// In the original variant, create doesn't take `expand`.
+// so we've renamed this to create_do and are currently
+// fiddling with the lifetimes and calls to make it work.
+pub fn create<'a, A, F, G>(
+    expand: &'a Box<F>,
+    shrink: &'a Box<G>,
+    random: Random<'a, A>,
+) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: Fn(A) -> &'a [A],
+    F: Fn(A) -> A,
+    G: Fn(A) -> &'a [A],
 {
-    from_random(random::map(
-        tree::unfold(&Box::new(move |x| x), shrink),
-        random,
-    ))
+    from_random(random::map(tree::unfold(expand, shrink), random))
 }
 
 #[cfg(test)]
