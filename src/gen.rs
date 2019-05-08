@@ -2,6 +2,7 @@ use crate::random;
 use crate::random::Random;
 use crate::tree;
 use crate::tree::Tree;
+use std::rc::Rc;
 
 pub struct Gen<'a, A>(#[allow(dead_code)] Random<'a, Tree<'a, A>>);
 
@@ -21,23 +22,12 @@ where
     from_random(delayed_rnd)
 }
 
-fn identity<A>(x: A) -> A {
-    x
-}
-
-// In the original variant, create doesn't take `expand`.
-// so we've renamed this to create_do and are currently
-// fiddling with the lifetimes and calls to make it work.
-pub fn create<'a, A, F, G>(
-    expand: &'a Box<F>,
-    shrink: &'a Box<G>,
-    random: Random<'a, A>,
-) -> Gen<'a, A>
+pub fn create<'a, A, F>(shrink: Rc<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: Fn(A) -> A,
-    G: Fn(A) -> &'a [A],
+    F: Fn(A) -> &'a [A],
 {
+    let expand = Rc::new(move |x| x);
     from_random(random::map(tree::unfold(expand, shrink), random))
 }
 

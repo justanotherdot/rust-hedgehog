@@ -1,4 +1,5 @@
 use lazy::Lazy;
+use std::rc::Rc;
 
 pub struct Tree<'a, A> {
     thunk: Lazy<'a, A>,
@@ -20,7 +21,7 @@ impl<'a, A: 'a + Clone> Tree<'a, A> {
 }
 
 /// Build a tree from an unfolding function and a seed value.
-pub fn unfold<'a, A, B, F, G>(f: &'a Box<F>, g: &'a Box<G>) -> impl Fn(B) -> Tree<'a, A>
+pub fn unfold<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>) -> impl Fn(B) -> Tree<'a, A>
 where
     A: Clone + 'a,
     B: Clone + 'a,
@@ -35,20 +36,22 @@ where
         let y = f(x.clone());
         Tree {
             thunk: Lazy::new(move || y.clone()),
-            children: unfold_forest(&f, &g, x),
+            children: unfold_forest(f.clone(), g.clone(), x),
         }
     }
 }
 
 /// Build a list of trees from an unfolding function and a seed value.
-pub fn unfold_forest<'a, A, B, F, G>(f: &'a Box<F>, g: &'a Box<G>, x: B) -> Vec<Tree<'a, A>>
+pub fn unfold_forest<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Vec<Tree<'a, A>>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(B) -> A,
     G: Fn(B) -> &'a [B],
 {
-    g(x).iter().map(move |v| unfold(f, g)(v.clone())).collect()
+    g(x).iter()
+        .map(move |v| unfold(f.clone(), g.clone())(v.clone()))
+        .collect()
 }
 
 #[cfg(test)]
