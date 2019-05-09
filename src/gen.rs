@@ -22,12 +22,13 @@ where
     from_random(delayed_rnd)
 }
 
-pub fn create<'a, A, F>(shrink: Rc<F>, random: Random<'a, A>) -> Gen<'a, A>
+pub fn create<'a, A, F>(shrink: Box<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
     F: Fn(A) -> &'a [A],
 {
     let expand = Rc::new(move |x| x);
+    let shrink: Rc<F> = shrink.into();
     from_random(random::map(tree::unfold(expand, shrink), random))
 }
 
