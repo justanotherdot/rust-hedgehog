@@ -1,4 +1,5 @@
 use lazy::Lazy;
+use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
 pub struct Tree<'a, A> {
@@ -20,13 +21,25 @@ impl<'a, A: 'a + Clone> Tree<'a, A> {
     }
 }
 
+impl<'a, A> Debug for Tree<'a, A> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        f.write_str("Tree")
+    }
+}
+
+impl<'a, A> PartialEq for Tree<'a, A> {
+    fn eq(&self, _rhs: &Self) -> bool {
+        true
+    }
+}
+
 /// Build a tree from an unfolding function and a seed value.
 pub fn unfold<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>) -> impl Fn(B) -> Tree<'a, A>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(B) -> A,
-    G: Fn(B) -> &'a [B],
+    G: Fn(B) -> Vec<B>,
 {
     // This is a bit horrific.
     // We should probably change this unfold into something
@@ -47,7 +60,7 @@ where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(B) -> A,
-    G: Fn(B) -> &'a [B],
+    G: Fn(B) -> Vec<B>,
 {
     g(x).iter()
         .map(move |v| unfold(f.clone(), g.clone())(v.clone()))

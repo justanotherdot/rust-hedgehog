@@ -25,19 +25,30 @@ where
 pub fn create<'a, A, F>(shrink: Box<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: Fn(A) -> &'a [A],
+    F: 'a + Fn(A) -> Vec<A>,
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
-    from_random(random::map(tree::unfold(expand, shrink), random))
+    from_random(random::map(Box::new(tree::unfold(expand, shrink)), random))
 }
 
 #[cfg(test)]
 mod test {
-    //use super::*;
+    use super::*;
+    use crate::range::Size;
+    use crate::seed::global;
+    use crate::shrink;
+    use crate::tree::Tree;
 
     #[test]
-    fn stub_for_gen() {
-        assert_eq!(1 + 1, 2);
+    fn create_works() {
+        let rand_fn = Rc::new(|_, _| 3);
+        let g = create(shrink::towards(3).into(), rand_fn.clone());
+        let rand_fn1 = to_random(g);
+        let global_seed = global();
+        assert_eq!(
+            Tree::singleton(rand_fn(global_seed.clone(), Size(1))),
+            rand_fn1(global_seed, Size(1))
+        );
     }
 }
