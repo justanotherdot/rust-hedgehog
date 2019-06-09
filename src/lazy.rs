@@ -1,5 +1,8 @@
+//use std::borrow::Cow;
+use std::cell::Cell;
+
 pub struct Lazy<'a, A> {
-    value: Option<A>,
+    value: Cell<Option<A>>,
     closure: Box<'a + Fn() -> A>,
 }
 
@@ -10,18 +13,23 @@ impl<'a, A: Clone> Lazy<'a, A> {
     {
         Lazy {
             closure: Box::new(closure),
-            value: None,
+            value: Cell::new(None),
         }
     }
 
-    fn force(&mut self) -> &A {
-        if self.value.is_none() {
-            self.value = Some((self.closure)());
+    fn force(&self) -> A {
+        let v = self.value.take();
+        if v.is_some() {
+            v.unwrap()
+        } else {
+            let v = (self.closure)();
+            self.value.replace(Some(v));
+            let v = self.value.take();
+            v.unwrap()
         }
-        &self.value.as_ref().unwrap()
     }
 
-    pub fn value(&mut self) -> &A {
+    pub fn value(&self) -> A {
         self.force()
     }
 }
@@ -33,17 +41,17 @@ mod tests {
 
     #[test]
     fn lazy_defer_application_until_forced() {
-        let mut t = Lazy::new(|| SystemTime::now());
+        let t = Lazy::new(|| SystemTime::now());
         let v = t.value();
-        assert!(*v != SystemTime::now());
+        assert!(v != SystemTime::now());
     }
 
     #[test]
     fn lazy_memoize_values() {
         let n = 42;
-        let mut t = Lazy::new(|| n);
+        let t = Lazy::new(|| n);
         t.value();
         t.value();
-        assert_eq!(*t.value(), n);
+        assert_eq!(t.value(), n);
     }
 }

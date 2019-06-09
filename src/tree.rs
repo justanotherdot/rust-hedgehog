@@ -5,10 +5,13 @@ use std::rc::Rc;
 pub struct Tree<'a, A> {
     thunk: Lazy<'a, A>,
     #[allow(dead_code)]
-    children: Vec<Tree<'a, A>>,
+    pub children: Vec<Tree<'a, A>>,
 }
 
-impl<'a, A: 'a + Clone> Tree<'a, A> {
+impl<'a, A> Tree<'a, A>
+where
+    A: 'a + Clone,
+{
     pub fn singleton(value: A) -> Tree<'a, A> {
         Tree {
             thunk: Lazy::new(move || value.clone()),
@@ -16,20 +19,37 @@ impl<'a, A: 'a + Clone> Tree<'a, A> {
         }
     }
 
-    pub fn value(&mut self) -> &A {
+    pub fn value(&self) -> A {
         self.thunk.value()
     }
 }
 
-impl<'a, A> Debug for Tree<'a, A> {
+impl<'a, A> Debug for Tree<'a, A>
+where
+    A: 'a + Clone + Debug,
+{
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        f.write_str("Tree")
+        // TODO: Actually print the children.
+        let has_children_str = if self.children.is_empty() {
+            format!("<>")
+        } else {
+            format!("<children>")
+        };
+        f.write_str(format!("Tree {{ {:?}, {} }}", self.value(), has_children_str).as_str())
     }
 }
 
-impl<'a, A> PartialEq for Tree<'a, A> {
-    fn eq(&self, _rhs: &Self) -> bool {
-        true
+impl<'a, A> PartialEq for Tree<'a, A>
+where
+    A: 'a + Clone + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.value() == other.value()
+            && self
+                .children
+                .iter()
+                .zip(&other.children)
+                .all(|(x, y)| x.value() == y.value())
     }
 }
 
@@ -74,9 +94,9 @@ mod tests {
     #[test]
     fn rose_trees_hold_lazy_values() {
         let n = 42;
-        let mut tree = Tree::singleton(n);
+        let tree = Tree::singleton(n);
         tree.value();
         tree.value();
-        assert_eq!(*tree.value(), n);
+        assert_eq!(tree.value(), n);
     }
 }
