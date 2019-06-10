@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+// TODO: For the moment we use RefCell but if someone tries to force a value on the same node at
+// the same time e.g. in parallel, this might cause a panic. This may not actually be a concern.
 #[derive(Clone)]
 pub struct Lazy<'a, A> {
     value: RefCell<Option<A>>,
