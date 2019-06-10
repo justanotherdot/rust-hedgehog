@@ -1,11 +1,14 @@
 use crate::random;
 use crate::random::Random;
+use crate::range::Size;
 use crate::tree;
 use crate::tree::Tree;
 use std::rc::Rc;
 
 pub struct Gen<'a, A>(#[allow(dead_code)] Random<'a, Tree<'a, A>>);
 
+// TODO: Would be handy to have From and Into traits implemented for
+// this to avoid a lot of the boilerplate.
 pub fn from_random<'a, A>(r: Random<'a, Tree<'a, A>>) -> Gen<'a, A> {
     Gen(r)
 }
@@ -64,6 +67,14 @@ where
     F: Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Tree<'a, B>>,
 {
     move |g: Gen<'a, A>| from_random(f(to_random(g)))
+}
+
+pub fn sized<'a, F, A>(f: Rc<F>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(Size) -> Gen<'a, A> + 'a,
+{
+    from_random(random::sized(Rc::new(move |s: Size| to_random(f(s)))))
 }
 
 #[cfg(test)]

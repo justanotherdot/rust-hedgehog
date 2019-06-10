@@ -41,6 +41,14 @@ where
     Rc::new(move |_, _| x.clone())
 }
 
+pub fn sized<'a, F, A>(f: Rc<F>) -> Random<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(Size) -> Random<'a, A> + 'a,
+{
+    Rc::new(move |seed, size| unsafe_run(seed, size, f(size)))
+}
+
 #[cfg(test)]
 mod test {
     //use super::*;
