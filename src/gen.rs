@@ -1,8 +1,11 @@
 use crate::random;
 use crate::random::Random;
-use crate::range::Size;
+use crate::range;
+use crate::range::{Range, Size};
+use crate::shrink;
 use crate::tree;
 use crate::tree::Tree;
+use num::{FromPrimitive, Integer, ToPrimitive};
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -99,6 +102,16 @@ where
         let f1 = f.clone();
         sized(Rc::new(move |n: Size| resize(f1(n.0))(g.clone())))
     }
+}
+
+pub fn integral<'a, A>(range: Range<'a, A>) -> Gen<'a, A>
+where
+    A: Copy + ToPrimitive + FromPrimitive + Integer + Clone + 'a,
+{
+    create(
+        Box::new(shrink::towards(range::origin(range.clone()))),
+        random::integral(range),
+    )
 }
 
 #[cfg(test)]

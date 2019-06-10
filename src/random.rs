@@ -1,5 +1,9 @@
+use crate::range;
+use crate::range::Range;
 use crate::range::Size;
+use crate::seed;
 use crate::seed::Seed;
+use num::{FromPrimitive, Integer, ToPrimitive};
 use std::rc::Rc;
 
 // TODO I've used the F# naming here with the ctor `Random`
@@ -54,6 +58,17 @@ where
     A: Clone + 'a,
 {
     move |r: Random<'a, A>| Rc::new(move |seed, _| run(seed, new_size, r.clone()))
+}
+
+pub fn integral<'a, A>(range: Range<'a, A>) -> Random<'a, A>
+where
+    A: Copy + ToPrimitive + FromPrimitive + Integer,
+{
+    Rc::new(move |seed, size| {
+        let (lo, hi) = range::bounds(size, range.clone());
+        let (x, _) = seed::next_integer(lo.to_isize().unwrap(), hi.to_isize().unwrap(), seed);
+        FromPrimitive::from_isize(x).unwrap()
+    })
 }
 
 #[cfg(test)]
