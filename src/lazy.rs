@@ -41,9 +41,11 @@ mod tests {
 
     #[test]
     fn lazy_defer_application_until_forced() {
-        let t = Lazy::new(|| SystemTime::now());
-        let v = t.value();
-        assert!(v != SystemTime::now());
+        let t = SystemTime::now();
+        let l = Lazy::new(|| t);
+        let v = l.value();
+        assert_eq!(v, t);
+        assert!(v.elapsed().unwrap() != SystemTime::now().elapsed().unwrap());
     }
 
     #[test]
