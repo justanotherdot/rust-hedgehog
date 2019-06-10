@@ -1,42 +1,44 @@
-//use std::borrow::Cow;
-use std::cell::Cell;
+use std::cell::RefCell;
+use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct Lazy<'a, A> {
-    value: Cell<Option<A>>,
-    closure: Box<'a + Fn() -> A>,
+    value: RefCell<Option<A>>,
+    closure: Rc<'a + Fn() -> A>,
 }
 
-impl<'a, A: Clone> Lazy<'a, A> {
+impl<'a, A> Lazy<'a, A>
+where
+    A: Clone,
+{
     pub fn new<F>(closure: F) -> Lazy<'a, A>
     where
         F: 'a + Fn() -> A,
     {
         Lazy {
-            closure: Box::new(closure),
-            value: Cell::new(None),
+            closure: Rc::new(closure),
+            value: RefCell::new(None),
         }
     }
 
-    fn force(&self) -> A {
-        let v = self.value.take();
-        if v.is_some() {
-            v.unwrap()
-        } else {
-            let v = (self.closure)();
-            self.value.replace(Some(v));
-            let v = self.value.take();
-            v.unwrap()
+    fn force(&self) {
+        let mut val = self.value.borrow_mut();
+        if val.is_none() {
+            let result = (self.closure)();
+            *val = Some(result);
         }
     }
 
-    pub fn value(&self) -> A {
-        self.force()
+    pub fn value(&self) -> Option<A> {
+        self.force();
+        self.value.clone().into_inner()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use lazy::Lazy;
+    use std::cell::RefCell;
     use std::time::SystemTime;
 
     #[test]
@@ -44,16 +46,23 @@ mod tests {
         let t = SystemTime::now();
         let l = Lazy::new(|| t);
         let v = l.value();
-        assert_eq!(v, t);
-        assert!(v.elapsed().unwrap() != SystemTime::now().elapsed().unwrap());
+        assert_eq!(v, Some(t));
+        assert!(v.unwrap().elapsed().unwrap() != SystemTime::now().elapsed().unwrap());
     }
 
     #[test]
-    fn lazy_memoize_values() {
+    fn lazy_memoize_values_01() {
         let n = 42;
-        let t = Lazy::new(|| n);
-        t.value();
-        t.value();
-        assert_eq!(t.value(), n);
+        let l = Lazy::new(|| n);
+        l.force();
+        l.force();
+        assert_eq!(l.value, RefCell::new(Some(n)));
+    }
+
+    #[test]
+    fn lazy_memoize_values_02() {
+        let n = 42;
+        let l = Lazy::new(|| n);
+        assert_eq!(l.value().unwrap(), n);
     }
 }

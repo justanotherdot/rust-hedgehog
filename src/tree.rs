@@ -2,6 +2,7 @@ use lazy::Lazy;
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct Tree<'a, A> {
     thunk: Lazy<'a, A>,
     #[allow(dead_code)]
@@ -19,7 +20,7 @@ where
         }
     }
 
-    pub fn value(&self) -> A {
+    pub fn value(&self) -> Option<A> {
         self.thunk.value()
     }
 }
@@ -35,7 +36,14 @@ where
         } else {
             format!("<children>")
         };
-        f.write_str(format!("Tree {{ {:?}, {} }}", self.value(), has_children_str).as_str())
+        f.write_str(
+            format!(
+                "Tree {{ {:?}, {} }}",
+                self.clone().value(),
+                has_children_str
+            )
+            .as_str(),
+        )
     }
 }
 
@@ -97,6 +105,6 @@ mod tests {
         let tree = Tree::singleton(n);
         tree.value();
         tree.value();
-        assert_eq!(tree.value(), n);
+        assert_eq!(tree.value(), Some(n));
     }
 }
