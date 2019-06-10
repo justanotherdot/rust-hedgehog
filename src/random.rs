@@ -17,7 +17,7 @@ pub fn run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
     unsafe_run(seed, size.max(Size(1)), r)
 }
 
-pub fn delay<'a, A>(f: Box<Fn() -> Random<'a, A> + 'a>) -> Random<'a, A>
+pub fn delay<'a, A>(f: Rc<Fn() -> Random<'a, A> + 'a>) -> Random<'a, A>
 where
     A: 'a,
 {
@@ -25,13 +25,20 @@ where
     Rc::new(move |seed, size| unsafe_run(seed, size, f()))
 }
 
-pub fn map<'a, A, B, F>(f: Box<F>, r: Random<'a, A>) -> Random<'a, B>
+pub fn map<'a, A, B, F>(f: Rc<F>, r: Random<'a, A>) -> Random<'a, B>
 where
     A: 'a,
     B: 'a,
     F: 'a + Fn(A) -> B,
 {
     Rc::new(move |seed, size| f(unsafe_run(seed, size, r.clone())))
+}
+
+pub fn constant<'a, A>(x: A) -> Random<'a, A>
+where
+    A: Clone + 'a,
+{
+    Rc::new(move |_, _| x.clone())
 }
 
 #[cfg(test)]

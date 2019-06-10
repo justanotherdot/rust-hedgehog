@@ -18,7 +18,7 @@ pub fn delay<'a, A>(f: Box<Fn() -> Gen<'a, A> + 'a>) -> Gen<'a, A>
 where
     A: 'a,
 {
-    let delayed_rnd = random::delay(Box::new(move || to_random(f())));
+    let delayed_rnd = random::delay(Rc::new(move || to_random(f())));
     from_random(delayed_rnd)
 }
 
@@ -29,7 +29,41 @@ where
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
-    from_random(random::map(Box::new(tree::unfold(expand, shrink)), random))
+    from_random(random::map(Rc::new(tree::unfold(expand, shrink)), random))
+}
+
+pub fn constant<'a, A>(x: A) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+{
+    from_random(random::constant(Tree::singleton(x)))
+}
+
+pub fn shrink<'a, F, A>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> Vec<A> + 'a,
+{
+    move |g: Gen<'a, A>| map_tree(Tree::expand(f.clone()).into())(g)
+}
+
+pub fn map_tree<'a, F, A, B>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(Tree<'a, A>) -> Tree<'a, B> + 'a,
+{
+    move |g: Gen<'a, A>| {
+        map_random(|r: Random<'a, Tree<'a, A>>| random::map(f.clone(), r.clone()))(g)
+    }
+}
+
+pub fn map_random<'a, F, A, B>(f: F) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    A: Clone + 'a,
+    F: Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Tree<'a, B>>,
+{
+    move |g: Gen<'a, A>| from_random(f(to_random(g)))
 }
 
 #[cfg(test)]

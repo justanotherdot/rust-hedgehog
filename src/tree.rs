@@ -13,6 +13,11 @@ impl<'a, A> Tree<'a, A>
 where
     A: 'a + Clone,
 {
+    fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
+        let thunk = Lazy::new(move || value.clone());
+        Tree { thunk, children }
+    }
+
     pub fn singleton(value: A) -> Tree<'a, A> {
         Tree {
             thunk: Lazy::new(move || value.clone()),
@@ -22,6 +27,22 @@ where
 
     pub fn value(&self) -> Option<A> {
         self.thunk.value()
+    }
+
+    pub fn expand<F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, A>
+    where
+        F: Fn(A) -> Vec<A>,
+    {
+        move |t: Tree<'a, A>| {
+            let mut children: Vec<Tree<'a, A>> = t
+                .children
+                .iter()
+                .map(|t| Self::expand(f.clone())(t.clone()))
+                .collect();
+            let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value().unwrap());
+            children.append(&mut zs);
+            Tree::new(t.value().unwrap(), children)
+        }
     }
 }
 

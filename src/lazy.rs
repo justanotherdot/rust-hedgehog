@@ -13,6 +13,8 @@ impl<'a, A> Lazy<'a, A>
 where
     A: Clone,
 {
+    // TODO: We can simplify the ergonomics of this interface by not requiring a closure.
+    // Instead, we can take a value, A, and do the closure ourselves.
     pub fn new<F>(closure: F) -> Lazy<'a, A>
     where
         F: 'a + Fn() -> A,
