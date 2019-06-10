@@ -5,6 +5,7 @@ use crate::tree;
 use crate::tree::Tree;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub struct Gen<'a, A>(#[allow(dead_code)] Random<'a, Tree<'a, A>>);
 
 // TODO: Would be handy to have From and Into traits implemented for
@@ -85,6 +86,18 @@ where
 {
     move |g: Gen<'a, A>| {
         map_random(|r: Random<'a, Tree<'a, A>>| random::resize(Size(new_size))(r))(g)
+    }
+}
+
+pub fn scale<'a, F, A>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(isize) -> isize + 'a,
+{
+    move |g: Gen<'a, A>| {
+        // We need this before the interior move below for `sized`.
+        let f1 = f.clone();
+        sized(Rc::new(move |n: Size| resize(f1(n.0))(g.clone())))
     }
 }
 
