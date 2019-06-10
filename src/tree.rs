@@ -14,13 +14,13 @@ where
     A: 'a + Clone,
 {
     fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
-        let thunk = Lazy::new(move || value.clone());
+        let thunk = Lazy::new(value);
         Tree { thunk, children }
     }
 
     pub fn singleton(value: A) -> Tree<'a, A> {
         Tree {
-            thunk: Lazy::new(move || value.clone()),
+            thunk: Lazy::new(value),
             children: vec![],
         }
     }
@@ -97,7 +97,7 @@ where
     move |x: B| {
         let y = f(x.clone());
         Tree {
-            thunk: Lazy::new(move || y.clone()),
+            thunk: Lazy::new(y),
             children: unfold_forest(f.clone(), g.clone(), x),
         }
     }

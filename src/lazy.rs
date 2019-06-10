@@ -11,11 +11,20 @@ pub struct Lazy<'a, A> {
 
 impl<'a, A> Lazy<'a, A>
 where
-    A: Clone,
+    A: Clone + 'a,
 {
     // TODO: We can simplify the ergonomics of this interface by not requiring a closure.
     // Instead, we can take a value, A, and do the closure ourselves.
-    pub fn new<F>(closure: F) -> Lazy<'a, A>
+    pub fn new(value: A) -> Lazy<'a, A> {
+        Lazy {
+            closure: Rc::new(move || value.clone()),
+            value: RefCell::new(None),
+        }
+    }
+
+    // TODO: We can simplify the ergonomics of this interface by not requiring a closure.
+    // Instead, we can take a value, A, and do the closure ourselves.
+    pub fn from_closure<F>(closure: F) -> Lazy<'a, A>
     where
         F: 'a + Fn() -> A,
     {
@@ -48,7 +57,7 @@ mod tests {
     #[test]
     fn lazy_defer_application_until_forced() {
         let t = SystemTime::now();
-        let l = Lazy::new(|| t);
+        let l = Lazy::new(t);
         let v = l.value();
         assert_eq!(v, Some(t));
         assert!(v.unwrap().elapsed().unwrap() != SystemTime::now().elapsed().unwrap());
@@ -57,7 +66,7 @@ mod tests {
     #[test]
     fn lazy_memoize_values_01() {
         let n = 42;
-        let l = Lazy::new(|| n);
+        let l = Lazy::new(n);
         l.force();
         l.force();
         assert_eq!(l.value, RefCell::new(Some(n)));
@@ -66,7 +75,7 @@ mod tests {
     #[test]
     fn lazy_memoize_values_02() {
         let n = 42;
-        let l = Lazy::new(|| n);
+        let l = Lazy::new(n);
         assert_eq!(l.value().unwrap(), n);
     }
 }
