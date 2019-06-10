@@ -77,6 +77,17 @@ where
     from_random(random::sized(Rc::new(move |s: Size| to_random(f(s)))))
 }
 
+// TODO: Generic num might be useful here.
+// I'm simply using isize for starters since that's what Size wraps.
+pub fn resize<'a, A>(new_size: isize) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+{
+    move |g: Gen<'a, A>| {
+        map_random(|r: Random<'a, Tree<'a, A>>| random::resize(Size(new_size))(r))(g)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

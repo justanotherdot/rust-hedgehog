@@ -49,6 +49,13 @@ where
     Rc::new(move |seed, size| unsafe_run(seed, size, f(size)))
 }
 
+pub fn resize<'a, A>(new_size: Size) -> impl Fn(Random<'a, A>) -> Random<'a, A>
+where
+    A: Clone + 'a,
+{
+    move |r: Random<'a, A>| Rc::new(move |seed, _| run(seed, new_size, r.clone()))
+}
+
 #[cfg(test)]
 mod test {
     //use super::*;
