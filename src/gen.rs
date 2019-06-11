@@ -2,6 +2,8 @@ use crate::random;
 use crate::random::Random;
 use crate::range;
 use crate::range::{Range, Size};
+use crate::seed;
+use crate::seed::Seed;
 use crate::shrink;
 use crate::tree;
 use crate::tree::Tree;
@@ -112,6 +114,50 @@ where
         Box::new(shrink::towards(range::origin(range.clone()))),
         random::integral(range),
     )
+}
+
+fn bind_random<'a, A, B, F>(m: Random<'a, Tree<'a, A>>) -> impl Fn(F) -> Random<'a, Tree<'a, B>>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> Random<'a, Tree<'a, B>> + 'a,
+{
+    move |k: F| {
+        Rc::new(move |seed0, size| {
+            let (seed1, seed2) = seed::split(seed0);
+            fn run<'a, X>(
+                seed: Seed,
+                size: Size,
+            ) -> impl Fn(Random<'a, Tree<'a, X>>) -> Tree<'a, X> {
+                move |random| random::run(seed, size, random)
+            }
+            let t1 = run(seed1, size)(m);
+            tree::bind(t1)(move |x| run(seed2, size)(k(x)))
+        })
+    }
+}
+
+pub fn bind<'a, A, B, F>(m0: Gen<'a, A>) -> impl Fn(F) -> Gen<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> Gen<'a, B> + 'a,
+{
+    move |k0: F| from_random(bind_random(to_random(m0))(move |x: A| to_random(k0(x))))
+}
+
+pub fn item<'a, I, A>(xs0: I) -> Gen<'a, A>
+where
+    I: Iterator<Item = A>,
+{
+    let xs: Vec<A> = xs0.collect();
+    if xs.is_empty() {
+        panic!("gem::item: 'xs' must have at least one element");
+    } else {
+        let _ix_gen = integral(range::constant(0, xs.len() - 1));
+        let _ix = unimplemented!();
+        //xs[ix];
+    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,6 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct Tree<'a, A> {
     thunk: Lazy<'a, A>,
-    #[allow(dead_code)]
     pub children: Vec<Tree<'a, A>>,
 }
 
@@ -42,6 +41,25 @@ where
             let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value().unwrap());
             children.append(&mut zs);
             Tree::new(t.value().unwrap(), children)
+        }
+    }
+}
+
+pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(F) -> Tree<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> Tree<'a, B> + 'a,
+{
+    let x = t.value();
+    let xs0 = t.children;
+    move |k: F| {
+        let t1 = k(x.unwrap());
+        let mut xs: Vec<Tree<'a, B>> = xs0.into_iter().map(|m| bind(m)(k)).collect();
+        xs.append(&mut t1.children);
+        Tree {
+            thunk: t1.thunk,
+            children: xs,
         }
     }
 }

@@ -31,12 +31,12 @@ pub fn next(Seed { value, gamma }: Seed) -> (u64, Seed) {
     (value, Seed { value, gamma })
 }
 
-pub fn split(s0: Seed) -> Seed {
+pub fn split(s0: Seed) -> (Seed, Seed) {
     let (v0, s1) = next(s0);
-    let (g0, _s2) = next(s1);
+    let (g0, s2) = next(s1);
     let value = mix64(v0);
     let gamma = mix_gamma(g0);
-    Seed { value, gamma }
+    (s2, Seed { value, gamma })
 }
 
 pub fn next_word64(s0: Seed) -> (u64, Seed) {
