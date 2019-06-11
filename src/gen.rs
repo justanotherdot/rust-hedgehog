@@ -148,15 +148,15 @@ where
 
 pub fn item<'a, I, A>(xs0: I) -> Gen<'a, A>
 where
+    A: Clone + 'a,
     I: Iterator<Item = A>,
 {
     let xs: Vec<A> = xs0.collect();
     if xs.is_empty() {
         panic!("gem::item: 'xs' must have at least one element");
     } else {
-        let _ix_gen = integral(range::constant(0, xs.len() - 1));
-        let _ix = unimplemented!();
-        //xs[ix];
+        let ix_gen = integral(range::constant(0, xs.len() - 1));
+        bind(ix_gen)(move |ix| from_random(Rc::new(|_, _| Tree::singleton(xs[ix]))))
     }
 }
 
