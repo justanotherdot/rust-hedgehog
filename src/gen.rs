@@ -156,7 +156,7 @@ where
         panic!("gem::item: 'xs' must have at least one element");
     } else {
         let ix_gen = integral(range::constant(0, xs.len() - 1));
-        bind(ix_gen)(move |ix| from_random(Rc::new(|_, _| Tree::singleton(xs[ix]))))
+        bind(ix_gen)(move |ix| constant(xs[ix]))
     }
 }
 
