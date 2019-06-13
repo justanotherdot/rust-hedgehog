@@ -17,7 +17,8 @@ pub fn global() -> Seed {
 }
 
 pub fn random() -> Seed {
-    split(global())
+    let (_, s) = split(global());
+    s
 }
 
 pub fn from(x: u64) -> Seed {

@@ -45,7 +45,8 @@ where
     }
 }
 
-pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(F) -> Tree<'a, B>
+// TODO: Needs to accept an Rc'd F.
+pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(Rc<F>) -> Tree<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
@@ -53,9 +54,9 @@ where
 {
     let x = t.value();
     let xs0 = t.children;
-    move |k: F| {
-        let t1 = k(x.unwrap());
-        let mut xs: Vec<Tree<'a, B>> = xs0.into_iter().map(|m| bind(m)(k)).collect();
+    move |k: Rc<F>| {
+        let mut t1 = k(x.clone().unwrap());
+        let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone())(k.clone())).collect();
         xs.append(&mut t1.children);
         Tree {
             thunk: t1.thunk,
