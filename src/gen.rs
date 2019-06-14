@@ -125,7 +125,6 @@ where
     )
 }
 
-// TODO: Needs to accept an Rc'd F.
 fn bind_random<'a, A, B, F>(m: Random<'a, Tree<'a, A>>) -> impl Fn(Rc<F>) -> Random<'a, Tree<'a, B>>
 where
     A: Clone + 'a,
@@ -152,15 +151,14 @@ where
     }
 }
 
-// TODO: Needs to accept an Rc'd F.
-pub fn bind<'a, A, B, F>(m0: Gen<'a, A>) -> impl Fn(F) -> Gen<'a, B>
+pub fn bind<'a, A, B, F>(m0: Gen<'a, A>) -> impl Fn(Rc<F>) -> Gen<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(A) -> Gen<'a, B> + 'a,
 {
     let m1 = m0.clone();
-    move |k0: F| {
+    move |k0: Rc<F>| {
         from_random(bind_random(to_random(m1.clone()))(Rc::new(move |x: A| {
             to_random(k0(x))
         })))
@@ -186,44 +184,49 @@ where
         panic!("gen::item: 'xs' must have at least one element");
     } else {
         let ix_gen = integral(range::constant(0, xs.len() - 1));
-        bind(ix_gen)(move |ix| constant(xs[ix].clone()))
+        bind(ix_gen)(Rc::new(move |ix: usize| constant(xs[ix].clone())))
     }
 }
 
-//pub fn frequency<'a, I, A>(xs0: I) -> Gen<'a, A>
-//where
-//A: Clone + 'a,
-//I: Iterator<Item = (isize, Gen<'a, A>)>,
-//{
-//let xs: Vec<(isize, Gen<'a, A>)> = xs0.collect();
-//let total = xs.iter().map(|(i, _)| i).sum();
+pub fn frequency<'a, I, A>(xs0: I) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    I: Iterator<Item = (isize, Gen<'a, A>)>,
+{
+    let xs: Vec<(isize, Gen<'a, A>)> = xs0.collect();
+    let total = xs.iter().map(|(i, _)| i).sum();
 
-//if xs.is_empty() {
-//panic!("gen::frequencey: 'xs' must have at least one element");
-//}
+    let pick = move |mut n, ys: Vec<(isize, Gen<'a, A>)>| {
+        ys.into_iter()
+            .fold(None, |acc, (k, y)| {
+                if n <= k {
+                    Some(y)
+                } else {
+                    n = n - k;
+                    acc
+                }
+            })
+            .expect("gen::frequency: 'xs' must have at least one element")
+    };
 
-//// TODO: This needs to be a fold.
-//// That should solve the undefined var issue below with `selection'.
-//let pick = move |n0| {
-//let mut n = n0;
-//move |ys: Vec<(isize, Gen<'a, A>)>| {
-//let mut selection;
-//for (k, y) in ys.into_iter() {
-//if n <= k {
-//selection = y;
-//continue;
-//} else {
-//n = n - k;
-//continue;
-//}
-//}
-//return selection;
-//}
-//};
+    let n_gen = integral(range::constant(1, total));
+    bind(n_gen)(Rc::new(move |n| pick(n, xs.clone())))
+}
 
-//let n_gen = integral(range::constant(1, total));
-//bind(n_gen)(move |n| pick(n)(xs.clone()))
-//}
+pub fn choice<'a, I, A>(xs0: I) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    I: Iterator<Item = Gen<'a, A>>,
+{
+{
+    let xs: Vec<Gen<'a, A>> = xs0.collect();
+    if xs.is_empty() {
+        panic!("gen::item: 'xs' must have at least one element");
+    } else {
+        let ix_gen = integral(range::constant(0, xs.len() - 1));
+        bind(ix_gen)(Rc::new(move |ix: usize| xs[ix].clone()))
+    }
+}
 
 #[cfg(test)]
 mod test {

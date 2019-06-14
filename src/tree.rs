@@ -47,7 +47,6 @@ where
     }
 }
 
-// TODO: Needs to accept an Rc'd F.
 pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(Rc<F>) -> Tree<'a, B>
 where
     A: Clone + 'a,
