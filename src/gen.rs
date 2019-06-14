@@ -218,13 +218,33 @@ where
     A: Clone + 'a,
     I: Iterator<Item = Gen<'a, A>>,
 {
-{
     let xs: Vec<Gen<'a, A>> = xs0.collect();
     if xs.is_empty() {
         panic!("gen::item: 'xs' must have at least one element");
     } else {
         let ix_gen = integral(range::constant(0, xs.len() - 1));
         bind(ix_gen)(Rc::new(move |ix: usize| xs[ix].clone()))
+    }
+}
+
+pub fn choice_rec<'a, I, A>(nonrecs: I) -> impl Fn(I) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    I: Clone + Iterator<Item = Gen<'a, A>> + 'a,
+{
+    move |recs: I| {
+        let nonrecs0 = nonrecs.clone();
+        sized(Rc::new(move |n| {
+            let nonrecs1 = nonrecs0.clone();
+            let recs1 = recs.clone();
+            if n <= Size(1) {
+                choice(nonrecs1)
+            } else {
+                let halve = move |x| x / 2;
+                let nonrecs = nonrecs1.chain(recs1.map(scale(Rc::new(halve))));
+                choice(nonrecs)
+            }
+        }))
     }
 }
 
