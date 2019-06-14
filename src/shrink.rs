@@ -52,7 +52,7 @@ where
 }
 
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, 'b, A>(destination: A) -> impl Fn(A) -> Vec<A>
+pub fn towards<'a, A>(destination: A) -> impl Fn(A) -> Vec<A>
 where
     A: 'a,
     A: Integer + FromPrimitive + Copy,
