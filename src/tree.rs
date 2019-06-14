@@ -1,9 +1,11 @@
 use lazy::Lazy;
-use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
-#[derive(Clone)]
-pub struct Tree<'a, A> {
+#[derive(Clone, Debug)]
+pub struct Tree<'a, A>
+where
+    A: Clone,
+{
     thunk: Lazy<'a, A>,
     pub children: Vec<Tree<'a, A>>,
 }
@@ -62,28 +64,6 @@ where
             thunk: t1.thunk,
             children: xs,
         }
-    }
-}
-
-impl<'a, A> Debug for Tree<'a, A>
-where
-    A: 'a + Clone + Debug,
-{
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        // TODO: Actually print the children.
-        let has_children_str = if self.children.is_empty() {
-            format!("<>")
-        } else {
-            format!("<children>")
-        };
-        f.write_str(
-            format!(
-                "Tree {{ {:?}, {} }}",
-                self.clone().value(),
-                has_children_str
-            )
-            .as_str(),
-        )
     }
 }
 

@@ -11,21 +11,29 @@ use num::{FromPrimitive, Integer, ToPrimitive};
 use std::rc::Rc;
 
 #[derive(Clone)]
-pub struct Gen<'a, A>(#[allow(dead_code)] Random<'a, Tree<'a, A>>);
+pub struct Gen<'a, A>(#[allow(dead_code)] Random<'a, Tree<'a, A>>)
+where
+    A: Clone;
 
 // TODO: Would be handy to have From and Into traits implemented for
 // this to avoid a lot of the boilerplate.
-pub fn from_random<'a, A>(r: Random<'a, Tree<'a, A>>) -> Gen<'a, A> {
+pub fn from_random<'a, A>(r: Random<'a, Tree<'a, A>>) -> Gen<'a, A>
+where
+    A: Clone,
+{
     Gen(r)
 }
 
-pub fn to_random<'a, A>(g: Gen<'a, A>) -> Random<Tree<'a, A>> {
+pub fn to_random<'a, A>(g: Gen<'a, A>) -> Random<Tree<'a, A>>
+where
+    A: Clone,
+{
     g.0
 }
 
 pub fn delay<'a, A>(f: Box<Fn() -> Gen<'a, A> + 'a>) -> Gen<'a, A>
 where
-    A: 'a,
+    A: Clone + 'a,
 {
     let delayed_rnd = random::delay(Rc::new(move || to_random(f())));
     from_random(delayed_rnd)
@@ -70,6 +78,7 @@ where
 pub fn map_random<'a, F, A, B>(f: F) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
 where
     A: Clone + 'a,
+    B: Clone + 'a,
     F: Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Tree<'a, B>>,
 {
     move |g: Gen<'a, A>| from_random(f(to_random(g)))
@@ -129,10 +138,10 @@ where
             let m2 = m1.clone();
             let k1 = k.clone();
             let (seed1, seed2) = seed::split(seed0);
-            fn run<'a, X>(
-                seed: Seed,
-                size: Size,
-            ) -> impl Fn(Random<'a, Tree<'a, X>>) -> Tree<'a, X> {
+            fn run<'a, X>(seed: Seed, size: Size) -> impl Fn(Random<'a, Tree<'a, X>>) -> Tree<'a, X>
+            where
+                X: Clone,
+            {
                 move |random| random::run(seed.clone(), size.clone(), random.clone())
             }
             let t1 = run(seed1, size)(m2);

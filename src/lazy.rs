@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
 // TODO: For the moment we use RefCell but if someone tries to force a value on the same node at
@@ -45,6 +46,16 @@ where
     pub fn value(&self) -> Option<A> {
         self.force();
         self.value.clone().into_inner()
+    }
+}
+
+impl<'a, A> Debug for Lazy<'a, A>
+where
+    A: Clone + Debug,
+{
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+        let val = self.value().unwrap();
+        f.write_str(&format!("{:#?}", val))
     }
 }
 
