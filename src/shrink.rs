@@ -52,13 +52,14 @@ where
 }
 
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, A: 'a>(destination: A) -> impl Fn(A) -> Vec<A>
+pub fn towards<'a, A>(destination: A) -> impl Fn(A) -> Vec<A>
 where
+    A: 'a,
     A: Integer + FromPrimitive + Copy,
 {
     let towards_do = move |x: A| {
         if destination == x {
-            Vec::new()
+            vec![]
         } else {
             // We need to halve our operands before subtracting them as they may be using
             // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')

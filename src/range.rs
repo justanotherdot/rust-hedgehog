@@ -1,4 +1,5 @@
 use num::{Bounded, Float, FromPrimitive, Integer, Num, ToPrimitive};
+use std::rc::Rc;
 
 //#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Num)]
 #[derive(
@@ -17,9 +18,10 @@ use num::{Bounded, Float, FromPrimitive, Integer, Num, ToPrimitive};
     Zero,
     Num,
 )]
-pub struct Size(isize);
+pub struct Size(pub isize);
 
-pub struct Range<'a, A: 'a>(A, Box<Fn(Size) -> (A, A) + 'a>);
+#[derive(Clone)]
+pub struct Range<'a, A: 'a>(A, Rc<Fn(Size) -> (A, A) + 'a>);
 
 impl<'a, A> Range<'a, A> {
     pub fn map<F, B>(f: F, Range(z, g): Range<'a, A>) -> Range<'a, B>
@@ -28,7 +30,7 @@ impl<'a, A> Range<'a, A> {
     {
         Range(
             f(z),
-            Box::new(move |sz| {
+            Rc::new(move |sz| {
                 let (a, b) = g(sz);
                 (f(a), f(b))
             }),
@@ -66,7 +68,7 @@ pub fn singleton<'a, A>(x: A) -> Range<'a, A>
 where
     A: Clone,
 {
-    Range(x.clone(), Box::new(move |_| (x.clone(), x.clone())))
+    Range(x.clone(), Rc::new(move |_| (x.clone(), x.clone())))
 }
 
 // FIXME lots of clones here the Haskell variant is probably simply using references to the same
@@ -84,7 +86,7 @@ pub fn constant_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
 where
     A: Clone,
 {
-    Range(z, Box::new(move |_| (x.clone(), y.clone())))
+    Range(z, Rc::new(move |_| (x.clone(), y.clone())))
 }
 
 pub fn constant_bounded<'a, A>() -> Range<'a, A>
@@ -111,7 +113,7 @@ where
 {
     Range(
         z.clone(),
-        Box::new(move |sz| {
+        Rc::new(move |sz| {
             let x_sized = clamp(
                 x.clone(),
                 y.clone(),
@@ -160,7 +162,7 @@ where
 {
     Range(
         z.clone(),
-        Box::new(move |sz| {
+        Rc::new(move |sz| {
             let x_sized = clamp(
                 x.clone(),
                 y.clone(),
@@ -221,7 +223,7 @@ where
 {
     Range(
         z.clone(),
-        Box::new(move |sz| {
+        Rc::new(move |sz| {
             let x_sized = clamp(
                 x.clone(),
                 y.clone(),
@@ -258,7 +260,7 @@ where
 {
     Range(
         z.clone(),
-        Box::new(move |sz| {
+        Rc::new(move |sz| {
             let x_sized = clamp(
                 x.clone(),
                 y.clone(),
@@ -299,7 +301,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn stub() {

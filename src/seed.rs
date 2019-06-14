@@ -17,12 +17,13 @@ pub fn global() -> Seed {
 }
 
 pub fn random() -> Seed {
-    split(global())
+    let (_, s) = split(global());
+    s
 }
 
 pub fn from(x: u64) -> Seed {
     let value = mix64(x);
-    let gamma = mix_gamma(x + GOLDEN_GAMMA);
+    let gamma = mix_gamma(x.wrapping_add(GOLDEN_GAMMA));
     Seed { value, gamma }
 }
 
@@ -31,12 +32,12 @@ pub fn next(Seed { value, gamma }: Seed) -> (u64, Seed) {
     (value, Seed { value, gamma })
 }
 
-pub fn split(s0: Seed) -> Seed {
+pub fn split(s0: Seed) -> (Seed, Seed) {
     let (v0, s1) = next(s0);
-    let (g0, _s2) = next(s1);
+    let (g0, s2) = next(s1);
     let value = mix64(v0);
     let gamma = mix_gamma(g0);
-    Seed { value, gamma }
+    (s2, Seed { value, gamma })
 }
 
 pub fn next_word64(s0: Seed) -> (u64, Seed) {
@@ -62,22 +63,22 @@ pub fn next_double(lo: f64, hi: f64, mut s0: Seed) -> (f64, Seed) {
 }
 
 pub fn mix64(x: u64) -> u64 {
-    let y = (x ^ (x >> 33)) * 0xff51afd7ed558ccd;
-    let z = (y ^ (y >> 33)) * 0xc4ceb9fe1a85ec53;
+    let y = (x ^ (x >> 33)).wrapping_mul(0xff51afd7ed558ccd);
+    let z = (y ^ (y >> 33)).wrapping_mul(0xc4ceb9fe1a85ec53);
     z ^ (z >> 33)
 }
 
 #[allow(overflowing_literals)]
 #[allow(exceeding_bitshifts)]
 pub fn mix32(x: u32) -> u32 {
-    let y = (x ^ (x >> 33)) * 0xff51afd7ed558ccd;
-    let z = (y ^ (y >> 33)) * 0xc4ceb9fe1a85ec53;
+    let y = (x ^ (x >> 33)).wrapping_mul(0xff51afd7ed558ccd);
+    let z = (y ^ (y >> 33)).wrapping_mul(0xc4ceb9fe1a85ec53);
     z >> 32
 }
 
 pub fn mix64_variant13(x: u64) -> u64 {
-    let y = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
-    let z = (y ^ (y >> 27)) * 0x94d049bb133111eb;
+    let y = (x ^ (x >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    let z = (y ^ (y >> 27)).wrapping_mul(0x94d049bb133111eb);
     z ^ (z >> 31)
 }
 
@@ -113,7 +114,7 @@ impl RngCore for Seed {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    //use super::*;
 
     #[test]
     fn stub() {
