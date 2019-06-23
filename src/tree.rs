@@ -114,6 +114,10 @@ where
         .collect()
 }
 
+pub fn outcome<A>(x: A) -> A {
+    unimplemented!()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

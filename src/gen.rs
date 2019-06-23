@@ -248,6 +248,59 @@ where
     }
 }
 
+// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Gen.fs#L268-L296
+//       https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Random.fs#L44-L50
+//       https://github.com/hedgehogqa/r-hedgehog/blob/master/R/gen.R
+fn try_filter_random<'a, A, F>(p: F) -> impl Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Option<Tree<'a, A>>>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool,
+{
+    move |r0: Random<'a, Tree<'a, A>>| {
+        fn try_n<'b, B>(k: B) -> Random<'b, Option<Tree<'b, B>>>
+            where B: Clone + 'b,
+        {
+            move |n| {
+                if k == 0 {
+                    random::constant(None)
+                } else {
+                    let r = random::resize(2*k+n)(r0);
+                    random::bind(r)(move |x| {
+                        if p(tree::outcome(x)) {
+                            random::constant(Some(tree::filter(p)(x)))
+                        } else {
+                            try_n(k+1)(n-1)
+                        }
+                    });
+                }
+            }
+        };
+        random::sized(Rc::new(move |m| { try_n(m.max(1)) } ))
+    }
+}
+
+pub fn filter<'a, A, F>(p: F) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool,
+{
+    move |g: Gen<'a, A>| {
+        fn loop0<'b, B>() -> impl Fn() -> Random<'b, B> {
+            move || {
+                random::bind(try_filter_random(p)(to_random(g))(Rc::new(
+                    move |opt| match opt {
+                        None => random::sized(Rc::new(move |n| {
+                            random::resize(Size(n.0 + 1))(random::delay(Rc::new(loop0))
+                        })),
+                        Some(x) => random::constant(x),
+                    },
+                )))
+            }
+        }
+        from_random(loop0())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

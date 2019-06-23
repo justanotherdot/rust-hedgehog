@@ -71,6 +71,21 @@ where
     })
 }
 
+pub fn bind<'a, A, B, F>(r0: Random<'a, A>) -> impl Fn(Rc<F>) -> Random<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> Random<'a, B> + 'a,
+{
+    let r1 = r0.clone();
+    move |k: Rc<F>| {
+        Rc::new(move |seed, size| {
+            let (seed1, seed2) = seed::split(seed);
+            unsafe_run(seed2, size, k(unsafe_run(seed, size, r1)))
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     //use super::*;
