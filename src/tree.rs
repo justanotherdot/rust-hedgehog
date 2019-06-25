@@ -114,8 +114,35 @@ where
         .collect()
 }
 
-pub fn outcome<A>(x: A) -> A {
-    unimplemented!()
+// TODO: iiuc this is just `value`.
+// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L12-L13
+pub fn outcome<'a, A>(t: Tree<'a, A>) -> A
+where
+    A: Clone + 'a,
+{
+    t.value().unwrap()
+}
+
+// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
+pub fn filter<'a, A, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |t: Tree<'a, A>| Tree::new(t.value().unwrap(), filter_forest(f.clone())(t.children))
+}
+
+pub fn filter_forest<'a, A, F>(f: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |xs: Vec<Tree<'a, A>>| {
+        xs.into_iter()
+            .filter(|x| f(outcome(x.clone())))
+            .map(|x| filter(f.clone())(x))
+            .collect()
+    }
 }
 
 #[cfg(test)]

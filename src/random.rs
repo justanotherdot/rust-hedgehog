@@ -11,6 +11,7 @@ use std::rc::Rc;
 // between each gen module so I'm trying to find a consistent
 // repr. between all three that makes sense to Rusts strengths.
 // TODO: Might make sense to have this as a Lazy.
+// TODO: Should the inner function here be an associated type?
 pub type Random<'a, A> = Rc<Fn(Seed, Size) -> A + 'a>;
 
 pub fn unsafe_run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
@@ -79,9 +80,15 @@ where
 {
     let r1 = r0.clone();
     move |k: Rc<F>| {
+        let r2 = r1.clone();
         Rc::new(move |seed, size| {
-            let (seed1, seed2) = seed::split(seed);
-            unsafe_run(seed2, size, k(unsafe_run(seed, size, r1)))
+            let seed0 = seed.clone();
+            let (_seed1, seed2) = seed::split(seed0);
+            unsafe_run(
+                seed2,
+                size,
+                k(unsafe_run(seed.clone(), size.clone(), r2.clone())),
+            )
         })
     }
 }

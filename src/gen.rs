@@ -248,56 +248,84 @@ where
     }
 }
 
-// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Gen.fs#L268-L296
-//       https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Random.fs#L44-L50
-//       https://github.com/hedgehogqa/r-hedgehog/blob/master/R/gen.R
-fn try_filter_random<'a, A, F>(p: F) -> impl Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Option<Tree<'a, A>>>
+fn try_filter_random<'a, A, F>(
+    p: Rc<F>,
+) -> impl Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Option<Tree<'a, A>>>
 where
     A: Clone + 'a,
-    F: Fn(A) -> bool,
+    F: Fn(A) -> bool + 'a,
 {
     move |r0: Random<'a, Tree<'a, A>>| {
-        fn try_n<'b, B>(k: B) -> Random<'b, Option<Tree<'b, B>>>
-            where B: Clone + 'b,
+        fn try_n<'b, B, G>(
+            p1: Rc<G>,
+            r1: Random<'b, Tree<'b, B>>,
+            k: Size,
+        ) -> impl Fn(Size) -> Random<'b, Option<Tree<'b, B>>>
+        where
+            B: Clone + 'b,
+            G: Fn(B) -> bool + 'b,
         {
-            move |n| {
-                if k == 0 {
+            let p2 = p1.clone();
+            move |n: Size| {
+                if k == Size(0) {
                     random::constant(None)
                 } else {
-                    let r = random::resize(2*k+n)(r0);
-                    random::bind(r)(move |x| {
-                        if p(tree::outcome(x)) {
-                            random::constant(Some(tree::filter(p)(x)))
+                    let r0 = r1.clone();
+                    let r1 = random::resize(Size(2 * k.0 + n.0))(r0.clone());
+                    let r2 = r1.clone();
+                    let p3 = p2.clone();
+                    let f = Rc::new(move |x: Tree<'b, B>| {
+                        if p3(tree::outcome(x.clone())) {
+                            random::constant(Some(tree::filter(p3.clone())(x)))
                         } else {
-                            try_n(k+1)(n-1)
+                            let size1 = Size(k.0 + 1);
+                            try_n(p3.clone(), r1.clone(), size1)(Size(n.0 - 1))
                         }
                     });
+                    random::bind(r2)(f)
                 }
             }
         };
-        random::sized(Rc::new(move |m| { try_n(m.max(1)) } ))
+        let p1 = p.clone();
+        random::sized(Rc::new(move |s: Size| {
+            let clamp_size = Size(s.0.max(1));
+            try_n(p1.clone(), r0.clone(), Size(0))(clamp_size)
+        }))
     }
 }
 
-pub fn filter<'a, A, F>(p: F) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
+pub fn filter<'a, A, F>(p: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: Fn(A) -> bool,
+    F: Fn(A) -> bool + 'a,
 {
     move |g: Gen<'a, A>| {
-        fn loop0<'b, B>() -> impl Fn() -> Random<'b, B> {
+        fn loop0<'b, B, G>(p: Rc<G>, g: Gen<'b, B>) -> impl Fn() -> Random<'b, Tree<'b, B>>
+        where
+            B: Clone + 'b,
+            G: Fn(B) -> bool + 'b,
+        {
             move || {
-                random::bind(try_filter_random(p)(to_random(g))(Rc::new(
-                    move |opt| match opt {
-                        None => random::sized(Rc::new(move |n| {
-                            random::resize(Size(n.0 + 1))(random::delay(Rc::new(loop0))
-                        })),
-                        Some(x) => random::constant(x),
-                    },
-                )))
+                let filtered_rand = try_filter_random(p.clone())(to_random(g.clone()));
+                let p1 = p.clone();
+                let g1 = g.clone();
+                let f = Rc::new(move |opt| match opt {
+                    None => {
+                        let p2 = p1.clone();
+                        let g2 = g1.clone();
+                        random::sized(Rc::new(move |n: Size| {
+                            let size1 = Size(n.0 + 1);
+                            let h = Rc::new(loop0(p2.clone(), g2.clone()));
+                            let delayed_loop = random::delay(h);
+                            random::resize(size1)(delayed_loop)
+                        }))
+                    }
+                    Some(x) => random::constant(x),
+                });
+                random::bind(filtered_rand)(f)
             }
         }
-        from_random(loop0())
+        from_random(loop0(p.clone(), g.clone())())
     }
 }
 
