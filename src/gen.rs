@@ -344,6 +344,18 @@ where
     }
 }
 
+pub fn some<'a, A>(g: Gen<'a, Option<A>>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+{
+    let filtered = filter(Rc::new(|x: Option<A>| x.is_some()))(g);
+    let f = Rc::new(move |x| match x {
+        None => panic!("internal error: unexpected None"),
+        Some(x) => constant(x),
+    });
+    bind(filtered)(f)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
