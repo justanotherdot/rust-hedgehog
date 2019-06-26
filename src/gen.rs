@@ -329,6 +329,21 @@ where
     }
 }
 
+pub fn try_filter<'a, A, F>(p: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Option<A>>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |g| {
+        let f = Rc::new(move |x0| match x0 {
+            None => random::constant(Tree::singleton(None)),
+            Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)))(x)),
+        });
+        let r = random::bind(try_filter_random(p.clone())(to_random(g)))(f);
+        from_random(r)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
