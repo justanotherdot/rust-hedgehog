@@ -84,6 +84,15 @@ where
     move |g: Gen<'a, A>| from_random(f(to_random(g)))
 }
 
+pub fn map<'a, F, A, B>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> B + 'a,
+{
+    move |g: Gen<'a, A>| map_tree(Rc::new(tree::map(f.clone())))(g)
+}
+
 pub fn sized<'a, F, A>(f: Rc<F>) -> Gen<'a, A>
 where
     A: Clone + 'a,
@@ -188,6 +197,7 @@ where
     }
 }
 
+// TODO: This ought to be an IntoIterator, I believe.
 pub fn frequency<'a, I, A>(xs0: I) -> Gen<'a, A>
 where
     A: Clone + 'a,
@@ -354,6 +364,23 @@ where
         Some(x) => constant(x),
     });
     bind(filtered)(f)
+}
+
+pub fn option<'a, A>(g: Gen<'a, A>) -> Gen<'a, Option<A>>
+where
+    A: Clone + 'a,
+{
+    let g1 = g.clone();
+    sized(Rc::new(move |n: Size| {
+        let g2 = g1.clone();
+        frequency(
+            vec![
+                (2, constant(None)),
+                (1 + n.0, map(Rc::new(move |x| Some(x)))(g2)),
+            ]
+            .into_iter(),
+        )
+    }))
 }
 
 #[cfg(test)]
