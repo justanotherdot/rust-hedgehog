@@ -453,6 +453,50 @@ pub fn bool<'a>() -> Gen<'a, bool> {
     item(vec![false, true].into_iter())
 }
 
+// TODO: These ought to be spit out by a macro.
+// byte.
+pub fn u8<'a>(range: Range<'a, u8>) -> Gen<'a, u8> {
+    integral(range)
+}
+
+pub fn i8<'a>(range: Range<'a, i8>) -> Gen<'a, i8> {
+    integral(range)
+}
+
+pub fn u16<'a>(range: Range<'a, u16>) -> Gen<'a, u16> {
+    integral(range)
+}
+
+pub fn i16<'a>(range: Range<'a, i16>) -> Gen<'a, i16> {
+    integral(range)
+}
+
+pub fn u32<'a>(range: Range<'a, u32>) -> Gen<'a, u32> {
+    integral(range)
+}
+
+pub fn i32<'a>(range: Range<'a, i32>) -> Gen<'a, i32> {
+    integral(range)
+}
+
+pub fn u64<'a>(range: Range<'a, u64>) -> Gen<'a, u64> {
+    integral(range)
+}
+
+pub fn i64<'a>(range: Range<'a, i64>) -> Gen<'a, i64> {
+    integral(range)
+}
+
+pub fn usize<'a>(range: Range<'a, usize>) -> Gen<'a, usize> {
+    integral(range)
+}
+
+pub fn isize<'a>(range: Range<'a, isize>) -> Gen<'a, isize> {
+    integral(range)
+}
+
+// TODO: Need float and double gens.
+
 #[cfg(test)]
 mod test {
     use super::*;
