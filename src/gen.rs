@@ -392,10 +392,51 @@ where
 pub fn char<'a>(lo: char) -> impl Fn(char) -> Gen<'a, char> {
     move |hi| {
         // Just pretend we can unwrap for now since that's what other langs do.
-        map(Rc::new(move |x| std::char::from_u32(x).unwrap()))(integral(range::constant(
+        map(Rc::new(move |x| unsafe {
+            std::char::from_u32_unchecked(x)
+        }))(integral(range::constant(lo as u32, hi as u32)))
+    }
+}
+
+pub fn unicode_all<'a>() -> Gen<'a, char> {
+    char('\0')(std::char::MAX)
+}
+
+pub fn digit<'a>() -> Gen<'a, char> {
+    char('0')('9')
+}
+
+pub fn lower<'a>() -> Gen<'a, char> {
+    char('a')('z')
+}
+
+pub fn upper<'a>() -> Gen<'a, char> {
+    char('A')('Z')
+}
+
+pub fn latin1<'a>() -> Gen<'a, char> {
+    char('\u{000}')('\u{255}')
+}
+
+pub fn unicode<'a>() -> Gen<'a, char> {
+    let unicode_all_opt = move |lo, hi| {
+        map(Rc::new(move |x| std::char::from_u32(x)))(integral(range::constant(
             lo as u32, hi as u32,
         )))
-    }
+    };
+
+    let unicode_all_opt_gen = unicode_all_opt('\0', std::char::MAX);
+    let reject_none = Rc::new(move |x: Option<char>| x.is_some());
+
+    map(Rc::new(move |x: Option<char>| x.unwrap()))(filter(reject_none)(unicode_all_opt_gen))
+}
+
+pub fn alpha<'a>() -> Gen<'a, char> {
+    choice(vec![lower(), upper()].into_iter())
+}
+
+pub fn alphanum<'a>() -> Gen<'a, char> {
+    choice(vec![lower(), upper(), digit()].into_iter())
 }
 
 #[cfg(test)]
