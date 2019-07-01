@@ -72,6 +72,7 @@ where
     towards_do
 }
 
+// TODO: rename to monomorphic variant.
 /// Shrink a floating-point number by edging towards a destination.
 /// Note we always try the destination first, as that is the optimal shrink.
 pub fn towards_float<'a, A: 'a>(destination: A) -> impl Fn(A) -> Vec<A>

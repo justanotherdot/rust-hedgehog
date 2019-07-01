@@ -93,6 +93,14 @@ where
     }
 }
 
+pub fn f64(range: Range<f64>) -> Random<f64> {
+    Rc::new(move |seed, size| {
+        let (lo, hi) = range::bounds(size, range);
+        let (x, _) = seed::next_double(lo, hi, seed);
+        x
+    })
+}
+
 #[cfg(test)]
 mod test {
     //use super::*;

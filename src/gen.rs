@@ -39,10 +39,11 @@ where
     from_random(delayed_rnd)
 }
 
+// TODO: Change this to an Rc?
 pub fn create<'a, A, F>(shrink: Box<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: 'a + Fn(A) -> Vec<A>,
+    F: Fn(A) -> Vec<A> + 'a,
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
@@ -496,6 +497,14 @@ pub fn isize<'a>(range: Range<'a, isize>) -> Gen<'a, isize> {
 }
 
 // TODO: Need float and double gens.
+
+pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
+    let r1 = range.clone();
+    create(
+        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        random::f64(r1),
+    )
+}
 
 #[cfg(test)]
 mod test {
