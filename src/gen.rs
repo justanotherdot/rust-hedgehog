@@ -383,6 +383,21 @@ where
     }))
 }
 
+// n.b. missing:
+// at_least
+// list
+// array (vec?)
+// seq
+
+pub fn char<'a>(lo: char) -> impl Fn(char) -> Gen<'a, char> {
+    move |hi| {
+        // Just pretend we can unwrap for now since that's what other langs do.
+        map(Rc::new(move |x| std::char::from_u32(x).unwrap()))(integral(range::constant(
+            lo as u32, hi as u32,
+        )))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
