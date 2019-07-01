@@ -439,6 +439,20 @@ pub fn alphanum<'a>() -> Gen<'a, char> {
     choice(vec![lower(), upper(), digit()].into_iter())
 }
 
+// TODO: Alternate impl probably required.
+// String could take from `unicode`
+//pub fn string<'a>(range: Range<'a, isize>) -> impl Fn(Gen<char>) -> Gen<string>
+//{
+//sized(
+//Rc::new(move |size: Size| {
+//})
+//)
+//}
+
+pub fn bool<'a>() -> Gen<'a, bool> {
+    item(vec![false, true].into_iter())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
