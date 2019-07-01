@@ -95,8 +95,16 @@ where
 
 pub fn f64(range: Range<f64>) -> Random<f64> {
     Rc::new(move |seed, size| {
-        let (lo, hi) = range::bounds(size, range);
+        let (lo, hi) = range::bounds(size, range.clone());
         let (x, _) = seed::next_double(lo, hi, seed);
+        x
+    })
+}
+
+pub fn f32(range: Range<f32>) -> Random<f32> {
+    Rc::new(move |seed, size| {
+        let (lo, hi) = range::bounds(size, range.clone());
+        let (x, _) = seed::next_float(lo, hi, seed);
         x
     })
 }

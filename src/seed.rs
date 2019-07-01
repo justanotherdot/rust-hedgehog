@@ -62,6 +62,12 @@ pub fn next_double(lo: f64, hi: f64, mut s0: Seed) -> (f64, Seed) {
     (v, s0)
 }
 
+pub fn next_float(lo: f32, hi: f32, mut s0: Seed) -> (f32, Seed) {
+    // Could use lo..hi.into()
+    let v = Uniform::from(lo..hi).sample(&mut s0);
+    (v, s0)
+}
+
 pub fn mix64(x: u64) -> u64 {
     let y = (x ^ (x >> 33)).wrapping_mul(0xff51afd7ed558ccd);
     let z = (y ^ (y >> 33)).wrapping_mul(0xc4ceb9fe1a85ec53);

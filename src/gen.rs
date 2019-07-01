@@ -506,6 +506,14 @@ pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
     )
 }
 
+pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
+    let r1 = range.clone();
+    create(
+        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        random::f32(r1),
+    )
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
