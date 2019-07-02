@@ -109,6 +109,39 @@ pub fn f32(range: Range<f32>) -> Random<f32> {
     })
 }
 
+pub fn replicate<'a, A>(times: isize) -> impl Fn(Random<'a, A>) -> Random<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    move |r: Random<'a, A>| {
+        let r1 = r.clone();
+        Rc::new(move |seed0: Seed, size: Size| {
+            fn loop0<'b, B>(
+                r1: Random<'b, B>,
+                size1: Size,
+                seed: Seed,
+                k: isize,
+                mut acc: Vec<B>,
+            ) -> Vec<B>
+            where
+                B: Clone + 'b,
+            {
+                if k <= 0 {
+                    acc
+                } else {
+                    let (seed1, seed2) = seed::split(seed);
+                    let x = unsafe_run(seed1, size1, r1.clone());
+                    // TODO: This insert is a bit funky.
+                    // It is _probably_ faster to push and then reverse.
+                    acc.insert(0, x);
+                    loop0(r1, size1, seed2, k - 1, acc)
+                }
+            }
+            loop0(r1.clone(), size, seed0, times, vec![])
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     //use super::*;
