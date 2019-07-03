@@ -519,7 +519,7 @@ pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
 //   datetime
 
 // TODO: isize -> int
-pub fn sample_tree<'a, A, F>(
+pub fn sample_tree<'a, A>(
     size: Size,
 ) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
 where
@@ -529,6 +529,20 @@ where
         Rc::new(move |g: Gen<'a, A>| {
             let seed = seed::random();
             random::run(seed, size, random::replicate(count)(to_random(g)))
+        })
+    }
+}
+
+pub fn sample<'a, A>(size: Size) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<A>>
+where
+    A: Clone + 'a,
+{
+    move |count: isize| {
+        Rc::new(move |g: Gen<'a, A>| {
+            sample_tree(size)(count)(g)
+                .into_iter()
+                .map(move |t| tree::outcome(t))
+                .collect()
         })
     }
 }
