@@ -8,6 +8,7 @@ use crate::shrink;
 use crate::tree;
 use crate::tree::Tree;
 use num::{FromPrimitive, Integer, ToPrimitive};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -545,6 +546,30 @@ where
                 .collect()
         })
     }
+}
+
+pub fn generate_tree<A>(g: Gen<A>) -> Tree<A>
+where
+    A: Clone,
+{
+    let seed = seed::random();
+    random::run(seed, Size(30), to_random(g))
+}
+
+pub fn print_sample<'a, A>(g: Gen<'a, A>)
+where
+    A: Clone + Debug + 'a,
+{
+    let forest = sample_tree(Size(10))(5)(g);
+    forest.into_iter().for_each(|t| {
+        println!("=== Outcome ===");
+        println!("{:?}", tree::outcome(&t));
+        println!("=== Shrinks ===");
+        tree::shrinks(t).iter().for_each(|s| {
+            println!("{:?}", tree::outcome(s));
+        });
+        println!(".");
+    })
 }
 
 #[cfg(test)]

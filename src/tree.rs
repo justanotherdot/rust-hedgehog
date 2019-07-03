@@ -1,4 +1,5 @@
 use lazy::Lazy;
+use std::borrow::Borrow;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -88,6 +89,7 @@ where
     F: Fn(B) -> A,
     G: Fn(B) -> Vec<B>,
 {
+    // FIX:
     // This is a bit horrific.
     // We should probably change this unfold into something
     // iterative (non-recursive) as to avoid this nightmare.
@@ -114,13 +116,31 @@ where
         .collect()
 }
 
-// TODO: iiuc this is just `value`.
-// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L12-L13
-pub fn outcome<'a, A>(t: Tree<'a, A>) -> A
+// TODO: Not sure if this a poor pattern.
+impl<'a, A> AsRef<Tree<'a, A>> for Tree<'a, A>
 where
     A: Clone + 'a,
 {
-    t.value().unwrap()
+    fn as_ref(&self) -> &Tree<'a, A> {
+        self.borrow()
+    }
+}
+
+// TODO: iiuc this is just `value`.
+// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L12-L13
+pub fn outcome<'a, A, T>(t: T) -> A
+where
+    A: Clone + 'a,
+    T: AsRef<Tree<'a, A>>,
+{
+    t.as_ref().value().unwrap()
+}
+
+pub fn shrinks<A>(t: Tree<A>) -> Vec<Tree<A>>
+where
+    A: Clone,
+{
+    t.children
 }
 
 // TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
