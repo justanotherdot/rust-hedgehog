@@ -8,6 +8,7 @@ use crate::shrink;
 use crate::tree;
 use crate::tree::Tree;
 use num::{FromPrimitive, Integer, ToPrimitive};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 #[derive(Clone)]
@@ -39,10 +40,11 @@ where
     from_random(delayed_rnd)
 }
 
+// TODO: Change this to an Rc?
 pub fn create<'a, A, F>(shrink: Box<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: 'a + Fn(A) -> Vec<A>,
+    F: Fn(A) -> Vec<A> + 'a,
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
@@ -82,6 +84,15 @@ where
     F: Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Tree<'a, B>>,
 {
     move |g: Gen<'a, A>| from_random(f(to_random(g)))
+}
+
+pub fn map<'a, F, A, B>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> B + 'a,
+{
+    move |g: Gen<'a, A>| map_tree(Rc::new(tree::map(f.clone())))(g)
 }
 
 pub fn sized<'a, F, A>(f: Rc<F>) -> Gen<'a, A>
@@ -125,7 +136,6 @@ where
     )
 }
 
-// TODO: Needs to accept an Rc'd F.
 fn bind_random<'a, A, B, F>(m: Random<'a, Tree<'a, A>>) -> impl Fn(Rc<F>) -> Random<'a, Tree<'a, B>>
 where
     A: Clone + 'a,
@@ -152,15 +162,14 @@ where
     }
 }
 
-// TODO: Needs to accept an Rc'd F.
-pub fn bind<'a, A, B, F>(m0: Gen<'a, A>) -> impl Fn(F) -> Gen<'a, B>
+pub fn bind<'a, A, B, F>(m0: Gen<'a, A>) -> impl Fn(Rc<F>) -> Gen<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(A) -> Gen<'a, B> + 'a,
 {
     let m1 = m0.clone();
-    move |k0: F| {
+    move |k0: Rc<F>| {
         from_random(bind_random(to_random(m1.clone()))(Rc::new(move |x: A| {
             to_random(k0(x))
         })))
@@ -186,44 +195,382 @@ where
         panic!("gen::item: 'xs' must have at least one element");
     } else {
         let ix_gen = integral(range::constant(0, xs.len() - 1));
-        bind(ix_gen)(move |ix| constant(xs[ix].clone()))
+        bind(ix_gen)(Rc::new(move |ix: usize| constant(xs[ix].clone())))
     }
 }
 
-//pub fn frequency<'a, I, A>(xs0: I) -> Gen<'a, A>
-//where
-//A: Clone + 'a,
-//I: Iterator<Item = (isize, Gen<'a, A>)>,
+// TODO: This ought to be an IntoIterator, I believe.
+pub fn frequency<'a, I, A>(xs0: I) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    I: Iterator<Item = (isize, Gen<'a, A>)>,
+{
+    let xs: Vec<(isize, Gen<'a, A>)> = xs0.collect();
+    let total = xs.iter().map(|(i, _)| i).sum();
+
+    let pick = move |mut n, ys: Vec<(isize, Gen<'a, A>)>| {
+        ys.into_iter()
+            .fold(None, |acc, (k, y)| {
+                if n <= k {
+                    Some(y)
+                } else {
+                    n = n - k;
+                    acc
+                }
+            })
+            .expect("gen::frequency: 'xs' must have at least one element")
+    };
+
+    let n_gen = integral(range::constant(1, total));
+    bind(n_gen)(Rc::new(move |n| pick(n, xs.clone())))
+}
+
+pub fn choice<'a, I, A>(xs0: I) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    I: Iterator<Item = Gen<'a, A>>,
+{
+    let xs: Vec<Gen<'a, A>> = xs0.collect();
+    if xs.is_empty() {
+        panic!("gen::item: 'xs' must have at least one element");
+    } else {
+        let ix_gen = integral(range::constant(0, xs.len() - 1));
+        bind(ix_gen)(Rc::new(move |ix: usize| xs[ix].clone()))
+    }
+}
+
+pub fn choice_rec<'a, I, A>(nonrecs: I) -> impl Fn(I) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    I: Clone + Iterator<Item = Gen<'a, A>> + 'a,
+{
+    move |recs: I| {
+        let nonrecs0 = nonrecs.clone();
+        sized(Rc::new(move |n| {
+            let nonrecs1 = nonrecs0.clone();
+            let recs1 = recs.clone();
+            if n <= Size(1) {
+                choice(nonrecs1)
+            } else {
+                let halve = move |x| x / 2;
+                let nonrecs = nonrecs1.chain(recs1.map(scale(Rc::new(halve))));
+                choice(nonrecs)
+            }
+        }))
+    }
+}
+
+fn try_filter_random<'a, A, F>(
+    p: Rc<F>,
+) -> impl Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Option<Tree<'a, A>>>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |r0: Random<'a, Tree<'a, A>>| {
+        fn try_n<'b, B, G>(
+            p1: Rc<G>,
+            r1: Random<'b, Tree<'b, B>>,
+            k: Size,
+        ) -> impl Fn(Size) -> Random<'b, Option<Tree<'b, B>>>
+        where
+            B: Clone + 'b,
+            G: Fn(B) -> bool + 'b,
+        {
+            let p2 = p1.clone();
+            move |n: Size| {
+                if k == Size(0) {
+                    random::constant(None)
+                } else {
+                    let r0 = r1.clone();
+                    let r1 = random::resize(Size(2 * k.0 + n.0))(r0.clone());
+                    let r2 = r1.clone();
+                    let p3 = p2.clone();
+                    let f = Rc::new(move |x: Tree<'b, B>| {
+                        if p3(tree::outcome(x.clone())) {
+                            random::constant(Some(tree::filter(p3.clone())(x)))
+                        } else {
+                            let size1 = Size(k.0 + 1);
+                            try_n(p3.clone(), r1.clone(), size1)(Size(n.0 - 1))
+                        }
+                    });
+                    random::bind(r2)(f)
+                }
+            }
+        };
+        let p1 = p.clone();
+        random::sized(Rc::new(move |s: Size| {
+            let clamp_size = Size(s.0.max(1));
+            try_n(p1.clone(), r0.clone(), Size(0))(clamp_size)
+        }))
+    }
+}
+
+pub fn filter<'a, A, F>(p: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |g: Gen<'a, A>| {
+        fn loop0<'b, B, G>(p: Rc<G>, g: Gen<'b, B>) -> impl Fn() -> Random<'b, Tree<'b, B>>
+        where
+            B: Clone + 'b,
+            G: Fn(B) -> bool + 'b,
+        {
+            move || {
+                let filtered_rand = try_filter_random(p.clone())(to_random(g.clone()));
+                let p1 = p.clone();
+                let g1 = g.clone();
+                let f = Rc::new(move |opt| match opt {
+                    None => {
+                        let p2 = p1.clone();
+                        let g2 = g1.clone();
+                        random::sized(Rc::new(move |n: Size| {
+                            let size1 = Size(n.0 + 1);
+                            let h = Rc::new(loop0(p2.clone(), g2.clone()));
+                            let delayed_loop = random::delay(h);
+                            random::resize(size1)(delayed_loop)
+                        }))
+                    }
+                    Some(x) => random::constant(x),
+                });
+                random::bind(filtered_rand)(f)
+            }
+        }
+        from_random(loop0(p.clone(), g.clone())())
+    }
+}
+
+pub fn try_filter<'a, A, F>(p: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Option<A>>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |g| {
+        let f = Rc::new(move |x0| match x0 {
+            None => random::constant(Tree::singleton(None)),
+            Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)))(x)),
+        });
+        let r = random::bind(try_filter_random(p.clone())(to_random(g)))(f);
+        from_random(r)
+    }
+}
+
+pub fn some<'a, A>(g: Gen<'a, Option<A>>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+{
+    let filtered = filter(Rc::new(|x: Option<A>| x.is_some()))(g);
+    let f = Rc::new(move |x| match x {
+        None => panic!("internal error: unexpected None"),
+        Some(x) => constant(x),
+    });
+    bind(filtered)(f)
+}
+
+pub fn option<'a, A>(g: Gen<'a, A>) -> Gen<'a, Option<A>>
+where
+    A: Clone + 'a,
+{
+    let g1 = g.clone();
+    sized(Rc::new(move |n: Size| {
+        let g2 = g1.clone();
+        frequency(
+            vec![
+                (2, constant(None)),
+                (1 + n.0, map(Rc::new(move |x| Some(x)))(g2)),
+            ]
+            .into_iter(),
+        )
+    }))
+}
+
+// n.b. missing:
+// at_least
+// list
+// array (vec?)
+// seq
+
+pub fn char<'a>(lo: char) -> impl Fn(char) -> Gen<'a, char> {
+    move |hi| {
+        // Just pretend we can unwrap for now since that's what other langs do.
+        map(Rc::new(move |x| unsafe {
+            std::char::from_u32_unchecked(x)
+        }))(integral(range::constant(lo as u32, hi as u32)))
+    }
+}
+
+pub fn unicode_all<'a>() -> Gen<'a, char> {
+    char('\0')(std::char::MAX)
+}
+
+pub fn digit<'a>() -> Gen<'a, char> {
+    char('0')('9')
+}
+
+pub fn lower<'a>() -> Gen<'a, char> {
+    char('a')('z')
+}
+
+pub fn upper<'a>() -> Gen<'a, char> {
+    char('A')('Z')
+}
+
+pub fn latin1<'a>() -> Gen<'a, char> {
+    char('\u{000}')('\u{255}')
+}
+
+pub fn unicode<'a>() -> Gen<'a, char> {
+    let unicode_all_opt = move |lo, hi| {
+        map(Rc::new(move |x| std::char::from_u32(x)))(integral(range::constant(
+            lo as u32, hi as u32,
+        )))
+    };
+
+    let unicode_all_opt_gen = unicode_all_opt('\0', std::char::MAX);
+    let reject_none = Rc::new(move |x: Option<char>| x.is_some());
+
+    map(Rc::new(move |x: Option<char>| x.unwrap()))(filter(reject_none)(unicode_all_opt_gen))
+}
+
+pub fn alpha<'a>() -> Gen<'a, char> {
+    choice(vec![lower(), upper()].into_iter())
+}
+
+pub fn alphanum<'a>() -> Gen<'a, char> {
+    choice(vec![lower(), upper(), digit()].into_iter())
+}
+
+// TODO: Alternate impl probably required.
+// String could take from `unicode`
+//pub fn string<'a>(range: Range<'a, isize>) -> impl Fn(Gen<char>) -> Gen<string>
 //{
-//let xs: Vec<(isize, Gen<'a, A>)> = xs0.collect();
-//let total = xs.iter().map(|(i, _)| i).sum();
-
-//if xs.is_empty() {
-//panic!("gen::frequencey: 'xs' must have at least one element");
+//sized(
+//Rc::new(move |size: Size| {
+//})
+//)
 //}
 
-//// TODO: This needs to be a fold.
-//// That should solve the undefined var issue below with `selection'.
-//let pick = move |n0| {
-//let mut n = n0;
-//move |ys: Vec<(isize, Gen<'a, A>)>| {
-//let mut selection;
-//for (k, y) in ys.into_iter() {
-//if n <= k {
-//selection = y;
-//continue;
-//} else {
-//n = n - k;
-//continue;
-//}
-//}
-//return selection;
-//}
-//};
+pub fn bool<'a>() -> Gen<'a, bool> {
+    item(vec![false, true].into_iter())
+}
 
-//let n_gen = integral(range::constant(1, total));
-//bind(n_gen)(move |n| pick(n)(xs.clone()))
-//}
+// TODO: These ought to be spit out by a macro.
+// byte.
+pub fn u8<'a>(range: Range<'a, u8>) -> Gen<'a, u8> {
+    integral(range)
+}
+
+pub fn i8<'a>(range: Range<'a, i8>) -> Gen<'a, i8> {
+    integral(range)
+}
+
+pub fn u16<'a>(range: Range<'a, u16>) -> Gen<'a, u16> {
+    integral(range)
+}
+
+pub fn i16<'a>(range: Range<'a, i16>) -> Gen<'a, i16> {
+    integral(range)
+}
+
+pub fn u32<'a>(range: Range<'a, u32>) -> Gen<'a, u32> {
+    integral(range)
+}
+
+pub fn i32<'a>(range: Range<'a, i32>) -> Gen<'a, i32> {
+    integral(range)
+}
+
+pub fn u64<'a>(range: Range<'a, u64>) -> Gen<'a, u64> {
+    integral(range)
+}
+
+pub fn i64<'a>(range: Range<'a, i64>) -> Gen<'a, i64> {
+    integral(range)
+}
+
+pub fn usize<'a>(range: Range<'a, usize>) -> Gen<'a, usize> {
+    integral(range)
+}
+
+pub fn isize<'a>(range: Range<'a, isize>) -> Gen<'a, isize> {
+    integral(range)
+}
+
+// TODO: Need float and double gens.
+
+pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
+    let r1 = range.clone();
+    create(
+        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        random::f64(r1),
+    )
+}
+
+pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
+    let r1 = range.clone();
+    create(
+        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        random::f32(r1),
+    )
+}
+
+// TODO:
+//   guid
+//   datetime
+
+// TODO: isize -> int
+pub fn sample_tree<'a, A>(
+    size: Size,
+) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
+where
+    A: Clone + 'a,
+{
+    move |count: isize| {
+        Rc::new(move |g: Gen<'a, A>| {
+            let seed = seed::random();
+            random::run(seed, size, random::replicate(count)(to_random(g)))
+        })
+    }
+}
+
+pub fn sample<'a, A>(size: Size) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<A>>
+where
+    A: Clone + 'a,
+{
+    move |count: isize| {
+        Rc::new(move |g: Gen<'a, A>| {
+            sample_tree(size)(count)(g)
+                .into_iter()
+                .map(move |t| tree::outcome(t))
+                .collect()
+        })
+    }
+}
+
+pub fn generate_tree<A>(g: Gen<A>) -> Tree<A>
+where
+    A: Clone,
+{
+    let seed = seed::random();
+    random::run(seed, Size(30), to_random(g))
+}
+
+pub fn print_sample<'a, A>(g: Gen<'a, A>)
+where
+    A: Clone + Debug + 'a,
+{
+    let forest = sample_tree(Size(10))(5)(g);
+    forest.into_iter().for_each(|t| {
+        println!("=== Outcome ===");
+        println!("{:?}", tree::outcome(&t));
+        println!("=== Shrinks ===");
+        tree::shrinks(t).iter().for_each(|s| {
+            println!("{:?}", tree::outcome(s));
+        });
+        println!(".");
+    })
+}
 
 #[cfg(test)]
 mod test {

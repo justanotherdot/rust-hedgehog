@@ -1,4 +1,5 @@
 use lazy::Lazy;
+use std::borrow::Borrow;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -47,7 +48,6 @@ where
     }
 }
 
-// TODO: Needs to accept an Rc'd F.
 pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(Rc<F>) -> Tree<'a, B>
 where
     A: Clone + 'a,
@@ -89,6 +89,7 @@ where
     F: Fn(B) -> A,
     G: Fn(B) -> Vec<B>,
 {
+    // FIX:
     // This is a bit horrific.
     // We should probably change this unfold into something
     // iterative (non-recursive) as to avoid this nightmare.
@@ -113,6 +114,68 @@ where
     g(x).iter()
         .map(move |v| unfold(f.clone(), g.clone())(v.clone()))
         .collect()
+}
+
+// TODO: Not sure if this a poor pattern.
+impl<'a, A> AsRef<Tree<'a, A>> for Tree<'a, A>
+where
+    A: Clone + 'a,
+{
+    fn as_ref(&self) -> &Tree<'a, A> {
+        self.borrow()
+    }
+}
+
+// TODO: iiuc this is just `value`.
+// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L12-L13
+pub fn outcome<'a, A, T>(t: T) -> A
+where
+    A: Clone + 'a,
+    T: AsRef<Tree<'a, A>>,
+{
+    t.as_ref().value().unwrap()
+}
+
+pub fn shrinks<A>(t: Tree<A>) -> Vec<Tree<A>>
+where
+    A: Clone,
+{
+    t.children
+}
+
+// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
+pub fn filter<'a, A, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, A>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |t: Tree<'a, A>| Tree::new(t.value().unwrap(), filter_forest(f.clone())(t.children))
+}
+
+pub fn filter_forest<'a, A, F>(f: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
+where
+    A: Clone + 'a,
+    F: Fn(A) -> bool + 'a,
+{
+    move |xs: Vec<Tree<'a, A>>| {
+        xs.into_iter()
+            .filter(|x| f(outcome(x.clone())))
+            .map(|x| filter(f.clone())(x))
+            .collect()
+    }
+}
+
+pub fn map<'a, A, B, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> B,
+{
+    move |t| {
+        let x = f(t.value().unwrap());
+        let xs = t.children.into_iter().map(|c| map(f.clone())(c)).collect();
+        Tree::new(x, xs)
+    }
 }
 
 #[cfg(test)]
