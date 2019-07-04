@@ -67,6 +67,64 @@ where
     }
 }
 
+pub fn join<'a, A>(tss: Tree<'a, Tree<'a, A>>) -> Tree<'a, A>
+where
+    A: Clone + 'a,
+{
+    bind(tss)(Rc::new(move |x| x))
+}
+
+pub fn duplicate<'a, A>(t: Tree<'a, A>) -> Tree<'a, Tree<'a, A>>
+where
+    A: Clone + 'a,
+{
+    let xs = t
+        .clone()
+        .children
+        .into_iter()
+        .map(|x| duplicate(x))
+        .collect();
+    Tree::new(t, xs)
+}
+
+pub fn fold<A, X, B, F, G>(f: Rc<F>) -> impl Fn(Rc<G>) -> Rc<dyn Fn(Tree<A>) -> B>
+where
+    A: Clone,
+    B: Clone,
+    X: Clone,
+    // TODO get rid of these static lifetimes
+    F: Fn(A) -> Rc<dyn Fn(X) -> B> + 'static,
+    G: Fn(Vec<B>) -> X + 'static,
+{
+    move |g: Rc<G>| {
+        let f = f.clone();
+        Rc::new(move |t: Tree<A>| {
+            let x = t.value().unwrap();
+            let xs = t.children;
+            f(x)(fold_forest(f.clone())(g.clone())(xs))
+        })
+    }
+}
+
+pub fn fold_forest<'a, A, X, B, F, G>(f: Rc<F>) -> impl Fn(Rc<G>) -> Rc<dyn Fn(Vec<Tree<A>>) -> X>
+where
+    A: Clone,
+    B: Clone,
+    X: Clone,
+    // TODO get rid of these static lifetimes
+    F: Fn(A) -> Rc<dyn Fn(X) -> B> + 'static,
+    G: Fn(Vec<B>) -> X + 'static,
+{
+    move |g: Rc<G>| {
+        let f = f.clone();
+        Rc::new(move |xs: Vec<Tree<A>>| {
+            g(xs.into_iter()
+                .map(|x| fold(f.clone())(g.clone())(x))
+                .collect())
+        })
+    }
+}
+
 impl<'a, A> PartialEq for Tree<'a, A>
 where
     A: 'a + Clone + PartialEq,
