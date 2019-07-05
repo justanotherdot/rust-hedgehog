@@ -1,7 +1,6 @@
 steps:
   - label: "Rust: stable"
     command:
-      - "cd rust"
       - "cargo build"
       - "cargo test"
     plugins:
