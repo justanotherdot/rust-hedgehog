@@ -1,0 +1,12 @@
+version: "3"
+services:
+    rust_stable_ci:
+      image: "rust:latest"
+      working_dir: /build
+      volumes:
+        - "$PWD:/build"
+    rust_nightly_ci:
+      image: "rustlang/rust:nightly"
+      working_dir: /build
+      volumes:
+        - "$PWD:/build"
