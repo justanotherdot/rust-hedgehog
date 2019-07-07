@@ -34,6 +34,31 @@ fn unfold<A, B>(f: impl Fn(B) -> Option<(A, B)>, b0: B) -> Vec<A> {
     }
 }
 
+// We don't discriminate between LazyList and List
+// and we treat LazyList as Vec.
+//pub fn removes<A>(k0: A) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+//where
+//A: Integer + FromPrimitive + Copy,
+//{
+//move |xs0: Vec<A>| {
+//fn loop0<B>(k: B, n: B, xs: Vec<B>) -> Vec<Vec<B>>
+//where
+//B: Integer + FromPrimitive + Copy,
+//{
+//let hd = xs.clone().into_iter().take(1);
+//let tl = xs.clone().into_iter().skip(1);
+//if k > n {
+//vec![]
+//} else if  tl.is_empty() {
+//vec![vec![]]
+//} else {
+
+//}
+//}
+//loop0(k0, (xs0.len()), xs0)
+//}
+//}
+
 pub fn halves<A>(n: A) -> Vec<A>
 where
     A: Integer + FromPrimitive + Copy,
