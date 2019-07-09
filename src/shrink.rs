@@ -34,6 +34,18 @@ fn unfold<A, B>(f: impl Fn(B) -> Option<(A, B)>, b0: B) -> Vec<A> {
     }
 }
 
+// n.b. Previously `list'
+pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>>
+where
+    A: Integer + FromPrimitive + Copy,
+{
+    halves(xs.len())
+        .into_iter()
+        .map(|k| removes(FromPrimitive::from_usize(k).unwrap())(xs.clone()))
+        .flatten()
+        .collect()
+}
+
 // We don't discriminate between LazyList and List
 // and we treat LazyList as Vec.
 pub fn removes<A>(k0: A) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
