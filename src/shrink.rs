@@ -1,6 +1,7 @@
 extern crate num;
 
 use self::num::{Float, FromPrimitive, Integer};
+use std::rc::Rc;
 
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
@@ -77,6 +78,40 @@ where
         }
         let gen_len = FromPrimitive::from_usize(xs0.len()).unwrap();
         loop0(k0, gen_len, xs0)
+    }
+}
+
+pub fn elems<A, F>(shrink: Rc<F>) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+where
+    A: Clone,
+    F: Fn(A) -> Vec<A>,
+{
+    move |xs00: Vec<A>| {
+        if xs00.is_empty() {
+            vec![]
+        } else {
+            let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
+            let x0 = xs01.get(0).unwrap();
+            let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
+            let mut ys: Vec<_> = shrink(x0.clone())
+                .into_iter()
+                .map(|x1| {
+                    let mut vs = vec![x1];
+                    vs.append(&mut xs0.clone());
+                    vs
+                })
+                .collect();
+            let mut zs: Vec<_> = elems(shrink.clone())(xs0)
+                .into_iter()
+                .map(|xs1| {
+                    let mut vs = vec![x0.clone()];
+                    vs.append(&mut xs1.clone());
+                    vs
+                })
+                .collect();
+            ys.append(&mut zs);
+            ys
+        }
     }
 }
 
