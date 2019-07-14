@@ -51,6 +51,21 @@ where
     from_random(random::map(Rc::new(tree::unfold(expand, shrink)), random))
 }
 
+pub fn apply<'a, A, B, F>(gf: Gen<'a, F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    F: Fn(A) -> B + Clone + 'a,
+    A: Clone + 'a,
+    B: Clone + 'a,
+{
+    move |gx: Gen<A>| {
+        let gf = gf.clone();
+        bind(gf)(Rc::new(move |f: F| {
+            let gx = gx.clone();
+            bind(gx)(Rc::new(move |x| constant(f(x))))
+        }))
+    }
+}
+
 pub fn constant<'a, A>(x: A) -> Gen<'a, A>
 where
     A: Clone + 'a,
