@@ -66,6 +66,15 @@ where
     }
 }
 
+pub fn map_random<'a, F, A, B>(f: F) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    F: Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Tree<'a, B>> + 'a,
+    A: Clone + 'a,
+    B: Clone + 'a,
+{
+    move |g: Gen<A>| from_random(f(to_random(g)))
+}
+
 pub fn constant<'a, A>(x: A) -> Gen<'a, A>
 where
     A: Clone + 'a,
