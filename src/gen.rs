@@ -149,6 +149,23 @@ where
     }
 }
 
+pub fn tuple<'a, A>(g: Gen<'a, A>) -> Gen<'a, (A, A)>
+where
+    A: Clone + 'a,
+{
+    let g1 = g.clone();
+    let g2 = g;
+    zip(g1)(g2)
+}
+
+pub fn no_shrink<'a, A>(g: Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+{
+    let drop = |t: Tree<'a, A>| Tree::new(tree::outcome(t), vec![]);
+    map_tree(Rc::new(drop))(g)
+}
+
 pub fn sized<'a, F, A>(f: Rc<F>) -> Gen<'a, A>
 where
     A: Clone + 'a,
@@ -495,15 +512,35 @@ pub fn alphanum<'a>() -> Gen<'a, char> {
     choice(vec![lower(), upper(), digit()].into_iter())
 }
 
-// TODO: Alternate impl probably required.
-// String could take from `unicode`
-//pub fn string<'a>(range: Range<'a, isize>) -> impl Fn(Gen<char>) -> Gen<string>
-//{
-//sized(
-//Rc::new(move |size: Size| {
-//})
-//)
-//}
+pub fn vec<'a, A>(range: Range<usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    move |g: Gen<'a, A>| {
+        from_random(random::sized(move |size| {
+            random::bind(random::integral(range))(move |k| {
+                random::bind(random::replicate(k)(to_random(g)))(move |xs| {
+                    tree::filter(at_least(range::lower_bound(size, range)))(shrink::sequence_list(
+                        xs,
+                    ))
+                })
+            })
+        }))
+    }
+}
+
+/// Feeding this function anything other than `unicode` may result in
+/// errors as this constructs well-formed UTF-8 strings.
+pub fn string<'a>(range: Range<'a, usize>) -> impl Fn(Gen<'a, char>) -> Gen<'a, String> {
+    move |g: Gen<'a, char>| {
+        let range = range.clone();
+        map(Rc::new(move |cs: Vec<char>| {
+            let s = String::with_capacity(cs.len());
+            cs.into_iter().for_each(|c| s.push(c));
+            s
+        }))(sized(Rc::new(move |size| vec(range.clone())(g.clone()))))
+    }
+}
 
 pub fn bool<'a>() -> Gen<'a, bool> {
     item(vec![false, true].into_iter())
