@@ -66,15 +66,6 @@ where
     }
 }
 
-pub fn map_random<'a, F, A, B>(f: F) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
-where
-    F: Fn(Random<'a, Tree<'a, A>>) -> Random<'a, Tree<'a, B>> + 'a,
-    A: Clone + 'a,
-    B: Clone + 'a,
-{
-    move |g: Gen<A>| from_random(f(to_random(g)))
-}
-
 pub fn constant<'a, A>(x: A) -> Gen<'a, A>
 where
     A: Clone + 'a,
@@ -117,6 +108,45 @@ where
     F: Fn(A) -> B + 'a,
 {
     move |g: Gen<'a, A>| map_tree(Rc::new(tree::map(f.clone())))(g)
+}
+
+// TODO: Turn map into a macro? e.g. map! that is variadic.
+pub fn map2<'a, F, A, B, C>(
+    f: Rc<F>,
+) -> impl Fn(Gen<'a, A>) -> Rc<Fn(Gen<'a, B>) -> Gen<'a, C> + 'a>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    C: Clone + 'a,
+    F: Fn(A, B) -> C + 'a,
+{
+    move |gx: Gen<'a, A>| {
+        let f = f.clone();
+        Rc::new(move |gy: Gen<'a, B>| {
+            let f = f.clone();
+            let gx = gx.clone();
+            bind(gx)(Rc::new(move |x: A| {
+                let f = f.clone();
+                let gy = gy.clone();
+                bind(gy)(Rc::new(move |y: B| {
+                    let x = x.clone();
+                    let y = y.clone();
+                    constant(f(x, y))
+                }))
+            }))
+        })
+    }
+}
+
+pub fn zip<'a, A, B>(gx: Gen<'a, A>) -> impl Fn(Gen<'a, B>) -> Gen<'a, (A, B)>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+{
+    move |gy: Gen<'a, B>| {
+        let gx = gx.clone();
+        map2(Rc::new(move |x, y| (x, y)))(gx)(gy)
+    }
 }
 
 pub fn sized<'a, F, A>(f: Rc<F>) -> Gen<'a, A>
