@@ -512,20 +512,27 @@ pub fn alphanum<'a>() -> Gen<'a, char> {
     choice(vec![lower(), upper(), digit()].into_iter())
 }
 
+pub fn at_least<'a, A>(n: usize) -> impl Fn(Vec<A>) -> bool
+where
+    A: Clone + 'a,
+{
+    move |xs: Vec<A>| n == 0 || !(xs.into_iter().skip(n - 1).collect::<Vec<A>>().is_empty())
+}
+
 pub fn vec<'a, A>(range: Range<usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
     move |g: Gen<'a, A>| {
-        from_random(random::sized(move |size| {
-            random::bind(random::integral(range))(move |k| {
-                random::bind(random::replicate(k)(to_random(g)))(move |xs| {
+        from_random(random::sized(Rc::new(move |size| {
+            random::bind(random::integral(range))(Rc::new(move |k| {
+                random::bind(random::replicate(k)(to_random(g)))(Rc::new(move |xs| {
                     tree::filter(at_least(range::lower_bound(size, range)))(shrink::sequence_list(
                         xs,
                     ))
-                })
-            })
-        }))
+                }))
+            }))
+        })))
     }
 }
 
