@@ -519,18 +519,30 @@ where
     move |xs: Vec<A>| n == 0 || !(xs.into_iter().skip(n - 1).collect::<Vec<A>>().is_empty())
 }
 
-pub fn vec<'a, A>(range: Range<usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Vec<A>>
+pub fn vec<'a, A>(range: Range<'a, usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
     move |g: Gen<'a, A>| {
         from_random(random::sized(Rc::new(move |size| {
+            let g = g.clone();
+            let range = range.clone();
             random::bind(random::integral(range))(Rc::new(move |k| {
-                random::bind(random::replicate(k)(to_random(g)))(Rc::new(move |xs| {
-                    tree::filter(at_least(range::lower_bound(size, range)))(shrink::sequence_list(
-                        xs,
-                    ))
-                }))
+                let g = g.clone();
+                let range = range.clone();
+                // FIX: `as isize` bad!
+                let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k as isize)(to_random(g));
+                let h = Rc::new(move |r| {
+                    let range = range.clone();
+                    let g = g.clone();
+                    let r0: Tree<'a, Vec<A>> = shrink::sequence_list(r);
+                    let f = Rc::new(|xs| {
+                        let range = range.clone();
+                        at_least(range::lower_bound(size, range))(xs)
+                    });
+                    random::constant(tree::filter(f)(r0))
+                });
+                random::bind(r)(h)
             }))
         })))
     }

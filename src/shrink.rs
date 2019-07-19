@@ -6,10 +6,7 @@ use crate::tree::Tree;
 use std::rc::Rc;
 
 // TODO: missing:
-//   * sequence
-//   * sequenceList
 //   * sequenceElems
-//   * sutff from LazyList
 
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
