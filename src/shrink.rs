@@ -1,6 +1,8 @@
 extern crate num;
 
 use self::num::{Float, FromPrimitive, Integer};
+use crate::tree;
+use crate::tree::Tree;
 use std::rc::Rc;
 
 // TODO: missing:
@@ -184,6 +186,45 @@ where
         }
     };
     towards_do
+}
+
+// TODO: Similar to `list`
+pub fn shrink_vec<A>(xs: Vec<A>) -> Vec<Vec<A>>
+where
+    A: Clone,
+{
+    halves(xs.len())
+        .into_iter()
+        .flat_map(|k| removes(k)(xs))
+        .collect()
+}
+
+pub fn sequence<'a, A, F>(merge: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+where
+    A: Clone + 'a,
+    // FIX: This is a bit silly because we don't have a LazyList type.
+    F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
+{
+    move |xs| {
+        let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
+        let ys = merge(xs)
+            .into_iter()
+            .map(|v| sequence(merge.clone())(v))
+            .collect();
+        Tree::new(y, ys)
+    }
+}
+
+pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    sequence(Rc::new(move |xs| {
+        shrink_vec(xs)
+            .into_iter()
+            .append(elems(tree::shrinks(xs)))
+            .collect()
+    }))(xs0)
 }
 
 #[cfg(test)]
