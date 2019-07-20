@@ -541,6 +541,15 @@ where
     }
 }
 
+// TODO: This will actually become posisble when const generics become normalised.
+#[allow(dead_code)]
+fn array<'a, A>(_range: Range<'a, usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, [A]>
+where
+    A: Clone + 'a,
+{
+    move |_| unimplemented!()
+}
+
 /// Feeding this function anything other than `unicode` may result in errors as this checks for
 /// valid UTF-8 on construction (per Rust's `String` type).
 pub fn string<'a>(range: Range<'a, usize>) -> impl Fn(Gen<'a, char>) -> Gen<'a, String> {
