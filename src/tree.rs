@@ -15,7 +15,7 @@ impl<'a, A> Tree<'a, A>
 where
     A: 'a + Clone,
 {
-    fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
+    pub fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
         let thunk = Lazy::new(value);
         Tree { thunk, children }
     }

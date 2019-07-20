@@ -40,8 +40,7 @@ where
     from_random(delayed_rnd)
 }
 
-// TODO: Change this to an Rc?
-pub fn create<'a, A, F>(shrink: Box<F>, random: Random<'a, A>) -> Gen<'a, A>
+pub fn create<'a, A, F>(shrink: Rc<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
     F: Fn(A) -> Vec<A> + 'a,
@@ -49,6 +48,22 @@ where
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
     from_random(random::map(Rc::new(tree::unfold(expand, shrink)), random))
+}
+
+// TODO: This probably will need to become `apply!` for the primary purpose of doing
+pub fn apply<'a, A, B, F>(gf: Gen<'a, F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
+where
+    F: Fn(A) -> B + Clone + 'a,
+    A: Clone + 'a,
+    B: Clone + 'a,
+{
+    move |gx: Gen<A>| {
+        let gf = gf.clone();
+        bind(gf)(Rc::new(move |f: F| {
+            let gx = gx.clone();
+            bind(gx)(Rc::new(move |x| constant(f(x))))
+        }))
+    }
 }
 
 pub fn constant<'a, A>(x: A) -> Gen<'a, A>
@@ -95,6 +110,62 @@ where
     move |g: Gen<'a, A>| map_tree(Rc::new(tree::map(f.clone())))(g)
 }
 
+// TODO: Turn map into a macro? e.g. map! that is variadic.
+pub fn map2<'a, F, A, B, C>(
+    f: Rc<F>,
+) -> impl Fn(Gen<'a, A>) -> Rc<Fn(Gen<'a, B>) -> Gen<'a, C> + 'a>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    C: Clone + 'a,
+    F: Fn(A, B) -> C + 'a,
+{
+    move |gx: Gen<'a, A>| {
+        let f = f.clone();
+        Rc::new(move |gy: Gen<'a, B>| {
+            let f = f.clone();
+            let gx = gx.clone();
+            bind(gx)(Rc::new(move |x: A| {
+                let f = f.clone();
+                let gy = gy.clone();
+                bind(gy)(Rc::new(move |y: B| {
+                    let x = x.clone();
+                    let y = y.clone();
+                    constant(f(x, y))
+                }))
+            }))
+        })
+    }
+}
+
+pub fn zip<'a, A, B>(gx: Gen<'a, A>) -> impl Fn(Gen<'a, B>) -> Gen<'a, (A, B)>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+{
+    move |gy: Gen<'a, B>| {
+        let gx = gx.clone();
+        map2(Rc::new(move |x, y| (x, y)))(gx)(gy)
+    }
+}
+
+pub fn tuple<'a, A>(g: Gen<'a, A>) -> Gen<'a, (A, A)>
+where
+    A: Clone + 'a,
+{
+    let g1 = g.clone();
+    let g2 = g;
+    zip(g1)(g2)
+}
+
+pub fn no_shrink<'a, A>(g: Gen<'a, A>) -> Gen<'a, A>
+where
+    A: Clone + 'a,
+{
+    let drop = |t: Tree<'a, A>| Tree::new(tree::outcome(t), vec![]);
+    map_tree(Rc::new(drop))(g)
+}
+
 pub fn sized<'a, F, A>(f: Rc<F>) -> Gen<'a, A>
 where
     A: Clone + 'a,
@@ -131,7 +202,7 @@ where
     A: Copy + ToPrimitive + FromPrimitive + Integer + Clone + 'a,
 {
     create(
-        Box::new(shrink::towards(range::origin(range.clone()))),
+        Rc::new(shrink::towards(range::origin(range.clone()))),
         random::integral(range),
     )
 }
@@ -385,12 +456,6 @@ where
     }))
 }
 
-// n.b. missing:
-// at_least
-// list
-// array (vec?)
-// seq
-
 pub fn char<'a>(lo: char) -> impl Fn(char) -> Gen<'a, char> {
     move |hi| {
         // Just pretend we can unwrap for now since that's what other langs do.
@@ -441,22 +506,68 @@ pub fn alphanum<'a>() -> Gen<'a, char> {
     choice(vec![lower(), upper(), digit()].into_iter())
 }
 
-// TODO: Alternate impl probably required.
-// String could take from `unicode`
-//pub fn string<'a>(range: Range<'a, isize>) -> impl Fn(Gen<char>) -> Gen<string>
-//{
-//sized(
-//Rc::new(move |size: Size| {
-//})
-//)
-//}
+pub fn at_least<'a, A>(n: usize) -> impl Fn(Vec<A>) -> bool
+where
+    A: Clone + 'a,
+{
+    move |xs: Vec<A>| n == 0 || !(xs.into_iter().skip(n - 1).collect::<Vec<A>>().is_empty())
+}
+
+pub fn vec<'a, A>(range: Range<'a, usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    move |g: Gen<'a, A>| {
+        let range = range.clone();
+        from_random(random::sized(Rc::new(move |size| {
+            let g = g.clone();
+            let range = range.clone();
+            random::bind(random::integral(range.clone()))(Rc::new(move |k| {
+                let g = g.clone();
+                let range = range.clone();
+                let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k)(to_random(g.clone()));
+                let h = Rc::new(move |r| {
+                    let range = range.clone();
+                    let r0: Tree<'a, Vec<A>> = shrink::sequence_list(r);
+                    let f = Rc::new(move |xs| {
+                        let range = range.clone();
+                        at_least(range::lower_bound(size, range))(xs)
+                    });
+                    random::constant(tree::filter(f)(r0))
+                });
+                random::bind(r)(h)
+            }))
+        })))
+    }
+}
+
+// TODO: This will actually become posisble when const generics become normalised.
+#[allow(dead_code)]
+fn array<'a, A>(_range: Range<'a, usize>) -> impl Fn(Gen<'a, A>) -> Gen<'a, [A]>
+where
+    A: Clone + 'a,
+{
+    move |_| unimplemented!()
+}
+
+/// Feeding this function anything other than `unicode` may result in errors as this checks for
+/// valid UTF-8 on construction (per Rust's `String` type).
+pub fn string<'a>(range: Range<'a, usize>) -> impl Fn(Gen<'a, char>) -> Gen<'a, String> {
+    move |g: Gen<'a, char>| {
+        let range = range.clone();
+        map(Rc::new(move |cs: Vec<char>| {
+            let mut s = String::with_capacity(cs.len());
+            cs.into_iter().for_each(|c| s.push(c));
+            s
+        }))(sized(Rc::new(move |_size| vec(range.clone())(g.clone()))))
+    }
+}
 
 pub fn bool<'a>() -> Gen<'a, bool> {
     item(vec![false, true].into_iter())
 }
 
-// TODO: These ought to be spit out by a macro.
-// byte.
+// n.b. previously `byte'
 pub fn u8<'a>(range: Range<'a, u8>) -> Gen<'a, u8> {
     integral(range)
 }
@@ -497,12 +608,10 @@ pub fn isize<'a>(range: Range<'a, isize>) -> Gen<'a, isize> {
     integral(range)
 }
 
-// TODO: Need float and double gens.
-
 pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
     let r1 = range.clone();
     create(
-        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        Rc::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
         random::f64(r1),
     )
 }
@@ -510,7 +619,7 @@ pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
 pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
     let r1 = range.clone();
     create(
-        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        Rc::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
         random::f32(r1),
     )
 }
@@ -519,14 +628,13 @@ pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
 //   guid
 //   datetime
 
-// TODO: isize -> int
 pub fn sample_tree<'a, A>(
     size: Size,
-) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
+) -> impl Fn(usize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
 where
     A: Clone + 'a,
 {
-    move |count: isize| {
+    move |count: usize| {
         Rc::new(move |g: Gen<'a, A>| {
             let seed = seed::random();
             random::run(seed, size, random::replicate(count)(to_random(g)))
@@ -534,11 +642,11 @@ where
     }
 }
 
-pub fn sample<'a, A>(size: Size) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<A>>
+pub fn sample<'a, A>(size: Size) -> impl Fn(usize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<A>>
 where
     A: Clone + 'a,
 {
-    move |count: isize| {
+    move |count: usize| {
         Rc::new(move |g: Gen<'a, A>| {
             sample_tree(size)(count)(g)
                 .into_iter()

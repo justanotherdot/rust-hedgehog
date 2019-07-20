@@ -1,13 +1,12 @@
 extern crate num;
 
 use self::num::{Float, FromPrimitive, Integer};
+use crate::tree;
+use crate::tree::Tree;
 use std::rc::Rc;
 
 // TODO: missing:
-//   * sequence
-//   * sequenceList
 //   * sequenceElems
-//   * sutff from LazyList
 
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
@@ -41,30 +40,20 @@ fn unfold<A, B>(f: impl Fn(B) -> Option<(A, B)>, b0: B) -> Vec<A> {
     }
 }
 
-// n.b. Previously `list'
-pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>>
-where
-    A: Integer + FromPrimitive + Copy,
-{
-    halves(xs.len())
-        .into_iter()
-        .map(|k| removes(FromPrimitive::from_usize(k).unwrap())(xs.clone()))
-        .flatten()
-        .collect()
-}
-
 // We don't discriminate between LazyList and List
 // and we treat LazyList as Vec.
-pub fn removes<A>(k0: A) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+pub fn removes<A, B>(k0: B) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
 where
-    A: Integer + FromPrimitive + Copy,
+    A: Clone,
+    B: Integer + FromPrimitive + Copy,
 {
     move |xs0: Vec<A>| {
-        fn loop0<B>(k: B, n: B, xs: Vec<B>) -> Vec<Vec<B>>
+        fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
         where
-            B: Integer + FromPrimitive + Copy,
+            C: Integer + FromPrimitive + Copy,
+            D: Clone,
         {
-            let hd = xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
+            let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
             let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
             if k > n {
                 vec![]
@@ -73,7 +62,8 @@ where
             } else {
                 let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
                     .into_iter()
-                    .map(|mut x| {
+                    .map(move |mut x| {
+                        let hd = hd.clone();
                         x.push(hd);
                         x
                     })
@@ -184,6 +174,58 @@ where
         }
     };
     towards_do
+}
+
+// n.b. previously `list'
+pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>>
+where
+    A: Clone,
+{
+    halves(xs.len())
+        .into_iter()
+        .flat_map(move |k| {
+            let xs = xs.clone();
+            removes(k)(xs)
+        })
+        .collect()
+}
+
+pub fn sequence<'a, A, F>(merge: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+where
+    A: Clone + 'a,
+    // FIX: This is a bit silly because we don't have a LazyList type.
+    F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
+{
+    move |xs| {
+        let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
+        let ys = merge(xs)
+            .into_iter()
+            .map(|v| sequence(merge.clone())(v))
+            .collect();
+        Tree::new(y, ys)
+    }
+}
+
+pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    sequence(Rc::new(move |xs: Vec<Tree<'a, A>>| {
+        let ys = xs.clone();
+        let mut shrinks = vec(xs);
+        let mut elems = elems(Rc::new(move |t| tree::shrinks(t)))(ys);
+        shrinks.append(&mut elems);
+        shrinks
+    }))(xs0)
+}
+
+pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    sequence(Rc::new(move |xs| {
+        elems(Rc::new(move |t| tree::shrinks(t)))(xs)
+    }))(xs0)
 }
 
 #[cfg(test)]
