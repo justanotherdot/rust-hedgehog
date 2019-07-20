@@ -219,6 +219,15 @@ where
     }))(xs0)
 }
 
+pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+where
+    A: Clone + 'a,
+{
+    sequence(Rc::new(move |xs| {
+        elems(Rc::new(move |t| tree::shrinks(t)))(xs)
+    }))(xs0)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
