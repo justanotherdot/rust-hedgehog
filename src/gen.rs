@@ -524,19 +524,18 @@ where
     A: Clone + 'a,
 {
     move |g: Gen<'a, A>| {
+        let range = range.clone();
         from_random(random::sized(Rc::new(move |size| {
             let g = g.clone();
             let range = range.clone();
-            random::bind(random::integral(range))(Rc::new(move |k| {
+            random::bind(random::integral(range.clone()))(Rc::new(move |k| {
                 let g = g.clone();
                 let range = range.clone();
-                // FIX: `as isize` bad!
-                let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k as isize)(to_random(g));
+                let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k)(to_random(g.clone()));
                 let h = Rc::new(move |r| {
                     let range = range.clone();
-                    let g = g.clone();
                     let r0: Tree<'a, Vec<A>> = shrink::sequence_list(r);
-                    let f = Rc::new(|xs| {
+                    let f = Rc::new(move |xs| {
                         let range = range.clone();
                         at_least(range::lower_bound(size, range))(xs)
                     });
@@ -554,10 +553,10 @@ pub fn string<'a>(range: Range<'a, usize>) -> impl Fn(Gen<'a, char>) -> Gen<'a, 
     move |g: Gen<'a, char>| {
         let range = range.clone();
         map(Rc::new(move |cs: Vec<char>| {
-            let s = String::with_capacity(cs.len());
+            let mut s = String::with_capacity(cs.len());
             cs.into_iter().for_each(|c| s.push(c));
             s
-        }))(sized(Rc::new(move |size| vec(range.clone())(g.clone()))))
+        }))(sized(Rc::new(move |_size| vec(range.clone())(g.clone()))))
     }
 }
 
@@ -632,11 +631,11 @@ pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
 // TODO: isize -> int
 pub fn sample_tree<'a, A>(
     size: Size,
-) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
+) -> impl Fn(usize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
 where
     A: Clone + 'a,
 {
-    move |count: isize| {
+    move |count: usize| {
         Rc::new(move |g: Gen<'a, A>| {
             let seed = seed::random();
             random::run(seed, size, random::replicate(count)(to_random(g)))
@@ -644,11 +643,11 @@ where
     }
 }
 
-pub fn sample<'a, A>(size: Size) -> impl Fn(isize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<A>>
+pub fn sample<'a, A>(size: Size) -> impl Fn(usize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<A>>
 where
     A: Clone + 'a,
 {
-    move |count: isize| {
+    move |count: usize| {
         Rc::new(move |g: Gen<'a, A>| {
             sample_tree(size)(count)(g)
                 .into_iter()

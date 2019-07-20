@@ -109,7 +109,7 @@ pub fn f32(range: Range<f32>) -> Random<f32> {
     })
 }
 
-pub fn replicate<'a, A>(times: isize) -> impl Fn(Random<'a, A>) -> Random<'a, Vec<A>>
+pub fn replicate<'a, A>(times: usize) -> impl Fn(Random<'a, A>) -> Random<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
@@ -120,7 +120,7 @@ where
                 r1: Random<'b, B>,
                 size1: Size,
                 seed: Seed,
-                k: isize,
+                k: usize,
                 mut acc: Vec<B>,
             ) -> Vec<B>
             where
