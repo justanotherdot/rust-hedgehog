@@ -40,8 +40,7 @@ where
     from_random(delayed_rnd)
 }
 
-// TODO: Change this to an Rc?
-pub fn create<'a, A, F>(shrink: Box<F>, random: Random<'a, A>) -> Gen<'a, A>
+pub fn create<'a, A, F>(shrink: Rc<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
     F: Fn(A) -> Vec<A> + 'a,
@@ -51,6 +50,7 @@ where
     from_random(random::map(Rc::new(tree::unfold(expand, shrink)), random))
 }
 
+// TODO: This probably will need to become `apply!` for the primary purpose of doing
 pub fn apply<'a, A, B, F>(gf: Gen<'a, F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
 where
     F: Fn(A) -> B + Clone + 'a,
@@ -202,7 +202,7 @@ where
     A: Copy + ToPrimitive + FromPrimitive + Integer + Clone + 'a,
 {
     create(
-        Box::new(shrink::towards(range::origin(range.clone()))),
+        Rc::new(shrink::towards(range::origin(range.clone()))),
         random::integral(range),
     )
 }
@@ -456,12 +456,6 @@ where
     }))
 }
 
-// n.b. missing:
-// at_least
-// list
-// array (vec?)
-// seq
-
 pub fn char<'a>(lo: char) -> impl Fn(char) -> Gen<'a, char> {
     move |hi| {
         // Just pretend we can unwrap for now since that's what other langs do.
@@ -547,8 +541,8 @@ where
     }
 }
 
-/// Feeding this function anything other than `unicode` may result in
-/// errors as this constructs well-formed UTF-8 strings.
+/// Feeding this function anything other than `unicode` may result in errors as this checks for
+/// valid UTF-8 on construction (per Rust's `String` type).
 pub fn string<'a>(range: Range<'a, usize>) -> impl Fn(Gen<'a, char>) -> Gen<'a, String> {
     move |g: Gen<'a, char>| {
         let range = range.clone();
@@ -564,8 +558,7 @@ pub fn bool<'a>() -> Gen<'a, bool> {
     item(vec![false, true].into_iter())
 }
 
-// TODO: These ought to be spit out by a macro.
-// byte.
+// n.b. previously `byte'
 pub fn u8<'a>(range: Range<'a, u8>) -> Gen<'a, u8> {
     integral(range)
 }
@@ -606,12 +599,10 @@ pub fn isize<'a>(range: Range<'a, isize>) -> Gen<'a, isize> {
     integral(range)
 }
 
-// TODO: Need float and double gens.
-
 pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
     let r1 = range.clone();
     create(
-        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        Rc::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
         random::f64(r1),
     )
 }
@@ -619,7 +610,7 @@ pub fn f64<'a>(range: Range<'a, f64>) -> Gen<'a, f64> {
 pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
     let r1 = range.clone();
     create(
-        Box::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
+        Rc::new(move |x| shrink::towards_float(range::origin(range.clone()))(x)),
         random::f32(r1),
     )
 }
@@ -628,7 +619,6 @@ pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
 //   guid
 //   datetime
 
-// TODO: isize -> int
 pub fn sample_tree<'a, A>(
     size: Size,
 ) -> impl Fn(usize) -> Rc<dyn Fn(Gen<'a, A>) -> Vec<Tree<'a, A>>>
