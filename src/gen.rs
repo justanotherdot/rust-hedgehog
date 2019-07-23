@@ -699,4 +699,9 @@ mod test {
             rand_fn1(global_seed, Size(1))
         );
     }
+
+    #[test]
+    fn test_print_sample() {
+        print_sample(unicode());
+    }
 }
