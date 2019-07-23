@@ -699,4 +699,11 @@ mod test {
             rand_fn1(global_seed, Size(1))
         );
     }
+
+    #[test]
+    fn print_sample_works() {
+        print_sample(alpha());
+        //print_sample(i64(range::singleton(12)));
+        //assert!(false);
+    }
 }

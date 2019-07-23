@@ -28,7 +28,7 @@ pub fn from(x: u64) -> Seed {
 }
 
 pub fn next(Seed { value, gamma }: Seed) -> (u64, Seed) {
-    let value = value + gamma;
+    let value = value.wrapping_add(gamma);
     (value, Seed { value, gamma })
 }
 
