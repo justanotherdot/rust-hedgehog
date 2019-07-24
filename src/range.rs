@@ -71,8 +71,6 @@ where
     Range(x.clone(), Rc::new(move |_| (x.clone(), x.clone())))
 }
 
-// FIXME lots of clones here the Haskell variant is probably simply using references to the same
-// one. So it might make sense to refactor this as an Rc around A.
 pub fn constant<'a, A>(x: A, y: A) -> Range<'a, A>
 where
     A: Clone,
@@ -80,8 +78,6 @@ where
     constant_from(x.clone(), x, y)
 }
 
-// FIXME lots of clones here the Haskell variant is probably simply using references to the same
-// one. So it might make sense to refactor this as an Rc around A.
 pub fn constant_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
 where
     A: Clone,

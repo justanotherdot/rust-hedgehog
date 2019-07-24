@@ -668,7 +668,7 @@ pub fn print_sample<'a, A>(g: Gen<'a, A>)
 where
     A: Clone + Debug + 'a,
 {
-    let forest = sample_tree(Size(10))(5)(g);
+    let forest = sample_tree(Size(30))(5)(g);
     forest.into_iter().for_each(|t| {
         println!("=== Outcome ===");
         println!("{:?}", tree::outcome(&t));
@@ -703,7 +703,8 @@ mod test {
     #[test]
     fn print_sample_works() {
         print_sample(alpha());
-        //print_sample(i64(range::singleton(12)));
+        print_sample(i64(range::singleton(12)));
+        //print_sample(vec(range::constant(1, 3))(u8(range::constant(3, 10))));
         //assert!(false);
     }
 }
