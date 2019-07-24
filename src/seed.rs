@@ -52,19 +52,19 @@ pub fn next_word32(s0: Seed) -> (u32, Seed) {
 
 // XXX Should this be BigInt?
 pub fn next_integer(lo: isize, hi: isize, mut s0: Seed) -> (isize, Seed) {
-    let v = Uniform::from(lo..hi).sample(&mut s0);
+    let v = Uniform::from(lo..=hi).sample(&mut s0);
     (v, s0)
 }
 
 pub fn next_double(lo: f64, hi: f64, mut s0: Seed) -> (f64, Seed) {
     // Could use lo..hi.into()
-    let v = Uniform::from(lo..hi).sample(&mut s0);
+    let v = Uniform::from(lo..=hi).sample(&mut s0);
     (v, s0)
 }
 
 pub fn next_float(lo: f32, hi: f32, mut s0: Seed) -> (f32, Seed) {
     // Could use lo..hi.into()
-    let v = Uniform::from(lo..hi).sample(&mut s0);
+    let v = Uniform::from(lo..=hi).sample(&mut s0);
     (v, s0)
 }
 
