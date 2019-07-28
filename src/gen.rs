@@ -80,7 +80,12 @@ where
     A: Clone + 'a,
     F: Fn(A) -> Vec<A> + 'a,
 {
-    move |g: Gen<'a, A>| map_tree(Tree::expand(f.clone()).into())(g)
+    move |g: Gen<'a, A>| {
+        let f = f.clone();
+        map_tree(Rc::new(move |x| {
+            Tree::expand(f.clone(), x)
+        }))(g)
+    }
 }
 
 pub fn map_tree<'a, F, A, B>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
