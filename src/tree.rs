@@ -101,12 +101,12 @@ where
         Rc::new(move |t: Tree<A>| {
             let x = t.value();
             let xs = t.children;
-            f(x)(fold_forest(f.clone())(g.clone())(xs))
+            f(x)(fold_forest(f.clone(), g.clone(), xs))
         })
     }
 }
 
-pub fn fold_forest<'a, A, X, B, F, G>(f: Rc<F>) -> impl Fn(Rc<G>) -> Rc<dyn Fn(Vec<Tree<A>>) -> X>
+pub fn fold_forest<'a, A, X, B, F, G>(f: Rc<F>, g: Rc<G>, xs: Vec<Tree<A>>) -> X
 where
     A: Clone,
     B: Clone,
@@ -115,14 +115,9 @@ where
     F: Fn(A) -> Rc<dyn Fn(X) -> B> + 'static,
     G: Fn(Vec<B>) -> X + 'static,
 {
-    move |g: Rc<G>| {
-        let f = f.clone();
-        Rc::new(move |xs: Vec<Tree<A>>| {
-            g(xs.into_iter()
-                .map(|x| fold(f.clone())(g.clone())(x))
-                .collect())
-        })
-    }
+    g(xs.into_iter()
+      .map(|x| fold(f.clone())(g.clone())(x))
+      .collect())
 }
 
 impl<'a, A> PartialEq for Tree<'a, A>
