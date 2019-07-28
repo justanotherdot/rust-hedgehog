@@ -27,7 +27,7 @@ where
         }
     }
 
-    pub fn value(&self) -> Option<A> {
+    pub fn value(&self) -> A {
         self.thunk.value()
     }
 
@@ -41,9 +41,9 @@ where
                 .iter()
                 .map(|t| Self::expand(f.clone())(t.clone()))
                 .collect();
-            let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value().unwrap());
+            let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
             children.append(&mut zs);
-            Tree::new(t.value().unwrap(), children)
+            Tree::new(t.value(), children)
         }
     }
 }
@@ -57,7 +57,7 @@ where
     let x = t.value();
     let xs0 = t.children;
     move |k: Rc<F>| {
-        let mut t1 = k(x.clone().unwrap());
+        let mut t1 = k(x.clone());
         let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone())(k.clone())).collect();
         xs.append(&mut t1.children);
         Tree {
@@ -99,7 +99,7 @@ where
     move |g: Rc<G>| {
         let f = f.clone();
         Rc::new(move |t: Tree<A>| {
-            let x = t.value().unwrap();
+            let x = t.value();
             let xs = t.children;
             f(x)(fold_forest(f.clone())(g.clone())(xs))
         })
@@ -191,7 +191,7 @@ where
     A: Clone + 'a,
     T: AsRef<Tree<'a, A>>,
 {
-    t.as_ref().value().unwrap()
+    t.as_ref().value()
 }
 
 pub fn shrinks<A>(t: Tree<A>) -> Vec<Tree<A>>
@@ -207,7 +207,7 @@ where
     A: Clone + 'a,
     F: Fn(A) -> bool + 'a,
 {
-    move |t: Tree<'a, A>| Tree::new(t.value().unwrap(), filter_forest(f.clone())(t.children))
+    move |t: Tree<'a, A>| Tree::new(t.value(), filter_forest(f.clone())(t.children))
 }
 
 pub fn filter_forest<'a, A, F>(f: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
@@ -230,7 +230,7 @@ where
     F: Fn(A) -> B,
 {
     move |t| {
-        let x = f(t.value().unwrap());
+        let x = f(t.value());
         let xs = t.children.into_iter().map(|c| map(f.clone())(c)).collect();
         Tree::new(x, xs)
     }
@@ -246,6 +246,6 @@ mod tests {
         let tree = Tree::singleton(n);
         tree.value();
         tree.value();
-        assert_eq!(tree.value(), Some(n));
+        assert_eq!(tree.value(), n);
     }
 }
