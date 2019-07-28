@@ -47,7 +47,9 @@ where
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
-    from_random(random::map(Rc::new(tree::unfold(expand, shrink)), random))
+    from_random(random::map(Rc::new(move |x| {
+        tree::unfold(expand.clone(), shrink.clone(), x)
+    }), random))
 }
 
 // TODO: This probably will need to become `apply!` for the primary purpose of doing
