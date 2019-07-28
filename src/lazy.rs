@@ -39,9 +39,9 @@ where
         }
     }
 
-    pub fn value(&self) -> Option<A> {
+    pub fn value(&self) -> A {
         self.force();
-        self.value.clone().into_inner()
+        self.value.clone().into_inner().unwrap()
     }
 }
 
@@ -50,7 +50,7 @@ where
     A: Clone + Debug,
 {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        let val = self.value().unwrap();
+        let val = self.value();
         f.write_str(&format!("{:#?}", val))
     }
 }
@@ -66,8 +66,8 @@ mod tests {
         let t = SystemTime::now();
         let l = Lazy::new(t);
         let v = l.value();
-        assert_eq!(v, Some(t));
-        assert!(v.unwrap().elapsed().unwrap() != SystemTime::now().elapsed().unwrap());
+        assert_eq!(v, t);
+        assert!(v.elapsed().unwrap() != SystemTime::now().elapsed().unwrap());
     }
 
     #[test]
@@ -83,6 +83,6 @@ mod tests {
     fn lazy_memoize_values_02() {
         let n = 42;
         let l = Lazy::new(n);
-        assert_eq!(l.value().unwrap(), n);
+        assert_eq!(l.value(), n);
     }
 }
