@@ -361,7 +361,7 @@ where
                     let p3 = p2.clone();
                     let f = Rc::new(move |x: Tree<'b, B>| {
                         if p3(tree::outcome(x.clone())) {
-                            random::constant(Some(tree::filter(p3.clone())(x)))
+                            random::constant(Some(tree::filter(p3.clone(), x)))
                         } else {
                             let size1 = Size(k.0 + 1);
                             try_n(p3.clone(), r1.clone(), size1)(Size(n.0 - 1))
@@ -535,7 +535,7 @@ where
                         let range = range.clone();
                         at_least(range::lower_bound(size, range))(xs)
                     });
-                    random::constant(tree::filter(f)(r0))
+                    random::constant(tree::filter(f, r0))
                 });
                 random::bind(r)(h)
             }))

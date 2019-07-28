@@ -185,12 +185,12 @@ where
 }
 
 // TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
-pub fn filter<'a, A, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, A>
+pub fn filter<'a, A, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, A>
 where
     A: Clone + 'a,
     F: Fn(A) -> bool + 'a,
 {
-    move |t: Tree<'a, A>| Tree::new(t.value(), filter_forest(f.clone())(t.children))
+    Tree::new(t.value(), filter_forest(f.clone())(t.children))
 }
 
 pub fn filter_forest<'a, A, F>(f: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
@@ -201,7 +201,7 @@ where
     move |xs: Vec<Tree<'a, A>>| {
         xs.into_iter()
             .filter(|x| f(outcome(x.clone())))
-            .map(|x| filter(f.clone())(x))
+            .map(|x| filter(f.clone(), x))
             .collect()
     }
 }
