@@ -7,11 +7,10 @@ steps:
       - docker-compose#v3.0.3:
           run: rust_stable_ci
 
-#  - label: "Rust: nightly"
-#    command:
-#      - "cd rust"
-#      - "cargo build"
-#      - "cargo test"
-#    plugins:
-#      - docker-compose#v3.0.3:
-#          run: rust_nightly_ci
+  - label: "Rust: nightly"
+    command:
+      - "cargo +nightly build"
+      - "cargo +nightly test"
+    plugins:
+      - docker-compose#v3.0.3:
+          run: rust_nightly_ci
