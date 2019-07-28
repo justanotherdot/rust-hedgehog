@@ -109,7 +109,12 @@ where
     B: Clone + 'a,
     F: Fn(A) -> B + 'a,
 {
-    move |g: Gen<'a, A>| map_tree(Rc::new(tree::map(f.clone())))(g)
+    move |g: Gen<'a, A>| {
+        let f = f.clone();
+        map_tree(Rc::new(move |x| {
+            tree::map(f.clone(), x)
+        }))(g)
+    }
 }
 
 // TODO: Turn map into a macro? e.g. map! that is variadic.
@@ -422,7 +427,7 @@ where
     move |g| {
         let f = Rc::new(move |x0| match x0 {
             None => random::constant(Tree::singleton(None)),
-            Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)))(x)),
+            Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)), x)),
         });
         let r = random::bind(try_filter_random(p.clone())(to_random(g)))(f);
         from_random(r)

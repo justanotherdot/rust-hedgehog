@@ -206,17 +206,15 @@ where
     }
 }
 
-pub fn map<'a, A, B, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, B>
+pub fn map<'a, A, B, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(A) -> B,
 {
-    move |t| {
-        let x = f(t.value());
-        let xs = t.children.into_iter().map(|c| map(f.clone())(c)).collect();
-        Tree::new(x, xs)
-    }
+    let x = f(t.value());
+    let xs = t.children.into_iter().map(|c| map(f.clone(), c)).collect();
+    Tree::new(x, xs)
 }
 
 #[cfg(test)]
