@@ -7,7 +7,7 @@ use std::rc::Rc;
 #[derive(Clone)]
 pub struct Lazy<'a, A> {
     value: RefCell<Option<A>>,
-    closure: Rc<'a + Fn() -> A>,
+    closure: Rc<dyn Fn() -> A + 'a>,
 }
 
 impl<'a, A> Lazy<'a, A>

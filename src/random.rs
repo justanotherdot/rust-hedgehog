@@ -12,7 +12,7 @@ use std::rc::Rc;
 // repr. between all three that makes sense to Rusts strengths.
 // TODO: Might make sense to have this as a Lazy.
 // TODO: Should the inner function here be an associated type?
-pub type Random<'a, A> = Rc<Fn(Seed, Size) -> A + 'a>;
+pub type Random<'a, A> = Rc<dyn Fn(Seed, Size) -> A + 'a>;
 
 pub fn unsafe_run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
     r(seed, size)
@@ -22,7 +22,7 @@ pub fn run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
     unsafe_run(seed, size.max(Size(1)), r)
 }
 
-pub fn delay<'a, A>(f: Rc<Fn() -> Random<'a, A> + 'a>) -> Random<'a, A>
+pub fn delay<'a, A>(f: Rc<dyn Fn() -> Random<'a, A> + 'a>) -> Random<'a, A>
 where
     A: 'a,
 {

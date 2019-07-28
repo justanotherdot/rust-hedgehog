@@ -32,7 +32,7 @@ where
     g.0
 }
 
-pub fn delay<'a, A>(f: Box<Fn() -> Gen<'a, A> + 'a>) -> Gen<'a, A>
+pub fn delay<'a, A>(f: Box<dyn Fn() -> Gen<'a, A> + 'a>) -> Gen<'a, A>
 where
     A: Clone + 'a,
 {
@@ -113,7 +113,7 @@ where
 // TODO: Turn map into a macro? e.g. map! that is variadic.
 pub fn map2<'a, F, A, B, C>(
     f: Rc<F>,
-) -> impl Fn(Gen<'a, A>) -> Rc<Fn(Gen<'a, B>) -> Gen<'a, C> + 'a>
+) -> impl Fn(Gen<'a, A>) -> Rc<dyn Fn(Gen<'a, B>) -> Gen<'a, C> + 'a>
 where
     A: Clone + 'a,
     B: Clone + 'a,

@@ -21,7 +21,7 @@ use std::rc::Rc;
 pub struct Size(pub isize);
 
 #[derive(Clone)]
-pub struct Range<'a, A: 'a>(A, Rc<Fn(Size) -> (A, A) + 'a>);
+pub struct Range<'a, A: 'a>(A, Rc<dyn Fn(Size) -> (A, A) + 'a>);
 
 impl<'a, A> Range<'a, A> {
     pub fn map<F, B>(f: F, Range(z, g): Range<'a, A>) -> Range<'a, B>

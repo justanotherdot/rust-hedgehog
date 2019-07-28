@@ -11,7 +11,7 @@ use std::rc::Rc;
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
 // pipeline a la the F# port.
-fn cons_nub<'a, A: 'a>(x: A) -> Box<Fn(Vec<A>) -> Vec<A> + 'a>
+fn cons_nub<'a, A: 'a>(x: A) -> Box<dyn Fn(Vec<A>) -> Vec<A> + 'a>
 where
     A: Integer + FromPrimitive + Copy,
 {
