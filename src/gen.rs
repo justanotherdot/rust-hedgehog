@@ -238,7 +238,7 @@ where
                 move |random| random::run(seed.clone(), size.clone(), random.clone())
             }
             let t1 = run(seed1, size)(m2);
-            tree::bind(t1)(Rc::new(move |x: A| {
+            tree::bind(t1, Rc::new(move |x: A| {
                 run(seed2.clone(), size.clone())(k1(x.clone()))
             }))
         })

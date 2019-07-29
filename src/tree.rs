@@ -46,7 +46,7 @@ where
     }
 }
 
-pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(Rc<F>) -> Tree<'a, B>
+pub fn bind<'a, A, B, F>(t: Tree<'a, A>, k: Rc<F>) -> Tree<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
@@ -54,14 +54,12 @@ where
 {
     let x = t.value();
     let xs0 = t.children;
-    move |k: Rc<F>| {
-        let mut t1 = k(x.clone());
-        let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone())(k.clone())).collect();
-        xs.append(&mut t1.children);
-        Tree {
-            thunk: t1.thunk,
-            children: xs,
-        }
+    let mut t1 = k(x.clone());
+    let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone(), k.clone())).collect();
+    xs.append(&mut t1.children);
+    Tree {
+        thunk: t1.thunk,
+        children: xs,
     }
 }
 
@@ -69,7 +67,7 @@ pub fn join<'a, A>(tss: Tree<'a, Tree<'a, A>>) -> Tree<'a, A>
 where
     A: Clone + 'a,
 {
-    bind(tss)(Rc::new(move |x| x))
+    bind(tss, Rc::new(move |x| x))
 }
 
 pub fn duplicate<'a, A>(t: Tree<'a, A>) -> Tree<'a, Tree<'a, A>>
