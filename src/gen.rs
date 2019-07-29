@@ -345,32 +345,30 @@ where
     A: Clone + 'a,
     F: Fn(A) -> bool + 'a,
 {
-    fn loop0<'b, B, G>(p: Rc<G>, g: Gen<'b, B>) -> impl Fn() -> Random<'b, Tree<'b, B>>
+    fn loop0<'b, B, G>(p: Rc<G>, g: Gen<'b, B>, _: ()) -> Random<'b, Tree<'b, B>>
     where
         B: Clone + 'b,
         G: Fn(B) -> bool + 'b,
     {
-        move || {
-            let filtered_rand = try_filter_random(p.clone(), to_random(g.clone()));
-            let p1 = p.clone();
-            let g1 = g.clone();
-            let f = Rc::new(move |opt| match opt {
-                None => {
-                    let p2 = p1.clone();
-                    let g2 = g1.clone();
-                    random::sized(Rc::new(move |n: Size| {
-                        let size1 = Size(n.0 + 1);
-                        let h = Rc::new(loop0(p2.clone(), g2.clone()));
-                        let delayed_loop = random::delay(h);
-                        random::resize(size1)(delayed_loop)
-                    }))
-                }
-                Some(x) => random::constant(x),
-            });
-            random::bind(filtered_rand)(f)
-        }
+        let filtered_rand = try_filter_random(p.clone(), to_random(g.clone()));
+        let p1 = p.clone();
+        let g1 = g.clone();
+        let f = Rc::new(move |opt| match opt {
+            None => {
+                let p2 = p1.clone();
+                let g2 = g1.clone();
+                let h = Rc::new(move || loop0(p2.clone(), g2.clone(), ()));
+                random::sized(Rc::new(move |n: Size| {
+                    let size1 = Size(n.0 + 1);
+                    let delayed_loop = random::delay(h.clone());
+                    random::resize(size1)(delayed_loop)
+                }))
+            }
+            Some(x) => random::constant(x),
+        });
+        random::bind(filtered_rand)(f)
     }
-    from_random(loop0(p.clone(), g.clone())())
+    from_random(loop0(p.clone(), g.clone(), ()))
 }
 
 pub fn try_filter<'a, A, F>(p: Rc<F>, g: Gen<'a, A>) -> Gen<'a, Option<A>>
