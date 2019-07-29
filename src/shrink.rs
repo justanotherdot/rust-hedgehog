@@ -75,37 +75,33 @@ where
     loop0(k0, gen_len, xs0)
 }
 
-pub fn elems<A, F>(shrink: Rc<F>) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+pub fn elems<A, F>(shrink: Rc<F>, xs00: Vec<A>) -> Vec<Vec<A>>
 where
     A: Clone,
     F: Fn(A) -> Vec<A>,
 {
-    move |xs00: Vec<A>| {
-        if xs00.is_empty() {
-            vec![]
-        } else {
-            let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
-            let x0 = xs01.get(0).unwrap();
-            let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
-            let mut ys: Vec<_> = shrink(x0.clone())
-                .into_iter()
-                .map(|x1| {
-                    let mut vs = vec![x1];
-                    vs.append(&mut xs0.clone());
-                    vs
-                })
-                .collect();
-            let mut zs: Vec<_> = elems(shrink.clone())(xs0)
-                .into_iter()
-                .map(|xs1| {
-                    let mut vs = vec![x0.clone()];
-                    vs.append(&mut xs1.clone());
-                    vs
-                })
-                .collect();
-            ys.append(&mut zs);
-            ys
-        }
+    if xs00.is_empty() {
+        vec![]
+    } else {
+        let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
+        let x0 = xs01.get(0).unwrap();
+        let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
+        let mut ys: Vec<_> = shrink(x0.clone())
+            .into_iter()
+            .map(|x1| {
+                let mut vs = vec![x1];
+                vs.append(&mut xs0.clone());
+                vs
+            }).collect();
+        let mut zs: Vec<_> = elems(shrink.clone(), xs0)
+            .into_iter()
+            .map(|xs1| {
+                let mut vs = vec![x0.clone()];
+                vs.append(&mut xs1.clone());
+                vs
+            }).collect();
+        ys.append(&mut zs);
+        ys
     }
 }
 
@@ -209,7 +205,7 @@ where
     sequence(Rc::new(move |xs: Vec<Tree<'a, A>>| {
         let ys = xs.clone();
         let mut shrinks = vec(xs);
-        let mut elems = elems(Rc::new(move |t| tree::shrinks(t)))(ys);
+        let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
         shrinks.append(&mut elems);
         shrinks
     }), xs0)
@@ -220,7 +216,7 @@ where
     A: Clone + 'a,
 {
     sequence(Rc::new(move |xs| {
-        elems(Rc::new(move |t| tree::shrinks(t)))(xs)
+        elems(Rc::new(move |t| tree::shrinks(t)), xs)
     }), xs0)
 }
 
