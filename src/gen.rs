@@ -166,7 +166,7 @@ pub fn resize<'a, A>(new_size: isize, g: Gen<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
 {
-    map_random(|r: Random<'a, Tree<'a, A>>| random::resize(Size(new_size))(r), g)
+    map_random(|r: Random<'a, Tree<'a, A>>| random::resize(Size(new_size), r), g)
 }
 
 pub fn scale<'a, F, A>(f: Rc<F>, g: Gen<'a, A>) -> Gen<'a, A>
@@ -319,7 +319,7 @@ where
             random::constant(None)
         } else {
             let r0 = r1.clone();
-            let r1 = random::resize(Size(2 * k.0 + n.0))(r0.clone());
+            let r1 = random::resize(Size(2 * k.0 + n.0), r0.clone());
             let r2 = r1.clone();
             let p3 = p2.clone();
             let f = Rc::new(move |x: Tree<'b, B>| {
@@ -361,7 +361,7 @@ where
                 random::sized(Rc::new(move |n: Size| {
                     let size1 = Size(n.0 + 1);
                     let delayed_loop = random::delay(h.clone());
-                    random::resize(size1)(delayed_loop)
+                    random::resize(size1, delayed_loop)
                 }))
             }
             Some(x) => random::constant(x),

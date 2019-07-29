@@ -54,11 +54,11 @@ where
     Rc::new(move |seed, size| unsafe_run(seed, size, f(size)))
 }
 
-pub fn resize<'a, A>(new_size: Size) -> impl Fn(Random<'a, A>) -> Random<'a, A>
+pub fn resize<'a, A>(new_size: Size, r: Random<'a, A>) -> Random<'a, A>
 where
     A: Clone + 'a,
 {
-    move |r: Random<'a, A>| Rc::new(move |seed, _| run(seed, new_size, r.clone()))
+    Rc::new(move |seed, _| run(seed, new_size, r.clone()))
 }
 
 pub fn integral<'a, A>(range: Range<'a, A>) -> Random<'a, A>
