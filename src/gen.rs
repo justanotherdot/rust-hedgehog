@@ -478,7 +478,7 @@ where
         random::bind(random::integral(range.clone()), Rc::new(move |k| {
             let g = g.clone();
             let range = range.clone();
-            let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k)(to_random(g.clone()));
+            let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k, to_random(g.clone()));
             let h = Rc::new(move |r| {
                 let range = range.clone();
                 let r0: Tree<'a, Vec<A>> = shrink::sequence_list(r);
@@ -573,7 +573,7 @@ where
     A: Clone + 'a,
 {
     let seed = seed::random();
-    random::run(seed, size, random::replicate(count)(to_random(g)))
+    random::run(seed, size, random::replicate(count, to_random(g)))
 }
 
 pub fn sample<'a, A>(size: Size, count: usize, g: Gen<'a, A>) -> Vec<A>
