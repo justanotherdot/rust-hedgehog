@@ -47,7 +47,9 @@ where
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
-    from_random(random::map(Rc::new(tree::unfold(expand, shrink)), random))
+    from_random(random::map(Rc::new(move |x| {
+        tree::unfold(expand.clone(), shrink.clone(), x)
+    }), random))
 }
 
 // TODO: This probably will need to become `apply!` for the primary purpose of doing
@@ -78,7 +80,12 @@ where
     A: Clone + 'a,
     F: Fn(A) -> Vec<A> + 'a,
 {
-    move |g: Gen<'a, A>| map_tree(Tree::expand(f.clone()).into())(g)
+    move |g: Gen<'a, A>| {
+        let f = f.clone();
+        map_tree(Rc::new(move |x| {
+            Tree::expand(f.clone(), x)
+        }))(g)
+    }
 }
 
 pub fn map_tree<'a, F, A, B>(f: Rc<F>) -> impl Fn(Gen<'a, A>) -> Gen<'a, B>
@@ -107,7 +114,12 @@ where
     B: Clone + 'a,
     F: Fn(A) -> B + 'a,
 {
-    move |g: Gen<'a, A>| map_tree(Rc::new(tree::map(f.clone())))(g)
+    move |g: Gen<'a, A>| {
+        let f = f.clone();
+        map_tree(Rc::new(move |x| {
+            tree::map(f.clone(), x)
+        }))(g)
+    }
 }
 
 // TODO: Turn map into a macro? e.g. map! that is variadic.
@@ -226,7 +238,7 @@ where
                 move |random| random::run(seed.clone(), size.clone(), random.clone())
             }
             let t1 = run(seed1, size)(m2);
-            tree::bind(t1)(Rc::new(move |x: A| {
+            tree::bind(t1, Rc::new(move |x: A| {
                 run(seed2.clone(), size.clone())(k1(x.clone()))
             }))
         })
@@ -359,7 +371,7 @@ where
                     let p3 = p2.clone();
                     let f = Rc::new(move |x: Tree<'b, B>| {
                         if p3(tree::outcome(x.clone())) {
-                            random::constant(Some(tree::filter(p3.clone())(x)))
+                            random::constant(Some(tree::filter(p3.clone(), x)))
                         } else {
                             let size1 = Size(k.0 + 1);
                             try_n(p3.clone(), r1.clone(), size1)(Size(n.0 - 1))
@@ -420,7 +432,7 @@ where
     move |g| {
         let f = Rc::new(move |x0| match x0 {
             None => random::constant(Tree::singleton(None)),
-            Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)))(x)),
+            Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)), x)),
         });
         let r = random::bind(try_filter_random(p.clone())(to_random(g)))(f);
         from_random(r)
@@ -533,7 +545,7 @@ where
                         let range = range.clone();
                         at_least(range::lower_bound(size, range))(xs)
                     });
-                    random::constant(tree::filter(f)(r0))
+                    random::constant(tree::filter(f, r0))
                 });
                 random::bind(r)(h)
             }))

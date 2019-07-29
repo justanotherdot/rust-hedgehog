@@ -31,24 +31,22 @@ where
         self.thunk.value()
     }
 
-    pub fn expand<F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, A>
+    pub fn expand<F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, A>
     where
         F: Fn(A) -> Vec<A>,
     {
-        move |t: Tree<'a, A>| {
-            let mut children: Vec<Tree<'a, A>> = t
-                .children
-                .iter()
-                .map(|t| Self::expand(f.clone())(t.clone()))
-                .collect();
-            let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
-            children.append(&mut zs);
-            Tree::new(t.value(), children)
-        }
+        let mut children: Vec<Tree<'a, A>> = t
+            .children
+            .iter()
+            .map(|t| Self::expand(f.clone(), t.clone()))
+            .collect();
+        let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
+        children.append(&mut zs);
+        Tree::new(t.value(), children)
     }
 }
 
-pub fn bind<'a, A, B, F>(t: Tree<'a, A>) -> impl Fn(Rc<F>) -> Tree<'a, B>
+pub fn bind<'a, A, B, F>(t: Tree<'a, A>, k: Rc<F>) -> Tree<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
@@ -56,14 +54,12 @@ where
 {
     let x = t.value();
     let xs0 = t.children;
-    move |k: Rc<F>| {
-        let mut t1 = k(x.clone());
-        let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone())(k.clone())).collect();
-        xs.append(&mut t1.children);
-        Tree {
-            thunk: t1.thunk,
-            children: xs,
-        }
+    let mut t1 = k(x.clone());
+    let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone(), k.clone())).collect();
+    xs.append(&mut t1.children);
+    Tree {
+        thunk: t1.thunk,
+        children: xs,
     }
 }
 
@@ -71,7 +67,7 @@ pub fn join<'a, A>(tss: Tree<'a, Tree<'a, A>>) -> Tree<'a, A>
 where
     A: Clone + 'a,
 {
-    bind(tss)(Rc::new(move |x| x))
+    bind(tss, Rc::new(move |x| x))
 }
 
 pub fn duplicate<'a, A>(t: Tree<'a, A>) -> Tree<'a, Tree<'a, A>>
@@ -87,7 +83,7 @@ where
     Tree::new(t, xs)
 }
 
-pub fn fold<A, X, B, F, G>(f: Rc<F>) -> impl Fn(Rc<G>) -> Rc<dyn Fn(Tree<A>) -> B>
+pub fn fold<A, X, B, F, G>(f: Rc<F>, g: Rc<G>, t: Tree<A>) -> B
 where
     A: Clone,
     B: Clone,
@@ -96,14 +92,9 @@ where
     F: Fn(A) -> Rc<dyn Fn(X) -> B> + 'static,
     G: Fn(Vec<B>) -> X + 'static,
 {
-    move |g: Rc<G>| {
-        let f = f.clone();
-        Rc::new(move |t: Tree<A>| {
-            let x = t.value();
-            let xs = t.children;
-            f(x)(fold_forest(f.clone(), g.clone(), xs))
-        })
-    }
+    let x = t.value();
+    let xs = t.children;
+    f(x)(fold_forest(f.clone(), g.clone(), xs))
 }
 
 pub fn fold_forest<'a, A, X, B, F, G>(f: Rc<F>, g: Rc<G>, xs: Vec<Tree<A>>) -> X
@@ -116,7 +107,7 @@ where
     G: Fn(Vec<B>) -> X + 'static,
 {
     g(xs.into_iter()
-      .map(|x| fold(f.clone())(g.clone())(x))
+      .map(|x| fold(f.clone(), g.clone(), x))
       .collect())
 }
 
@@ -135,24 +126,17 @@ where
 }
 
 /// Build a tree from an unfolding function and a seed value.
-pub fn unfold<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>) -> impl Fn(B) -> Tree<'a, A>
+pub fn unfold<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Tree<'a, A>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(B) -> A,
     G: Fn(B) -> Vec<B>,
 {
-    // FIX:
-    // This is a bit horrific.
-    // We should probably change this unfold into something
-    // iterative (non-recursive) as to avoid this nightmare.
-    // It may also be worth exploring the use of FnBox, instead.
-    move |x: B| {
-        let y = f(x.clone());
-        Tree {
-            thunk: Lazy::new(y),
-            children: unfold_forest(f.clone(), g.clone(), x),
-        }
+    let y = f(x.clone());
+    Tree {
+        thunk: Lazy::new(y),
+        children: unfold_forest(f.clone(), g.clone(), x),
     }
 }
 
@@ -165,7 +149,7 @@ where
     G: Fn(B) -> Vec<B>,
 {
     g(x).iter()
-        .map(move |v| unfold(f.clone(), g.clone())(v.clone()))
+        .map(move |v| unfold(f.clone(), g.clone(), v.clone()))
         .collect()
 }
 
@@ -197,38 +181,34 @@ where
 }
 
 // TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
-pub fn filter<'a, A, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, A>
+pub fn filter<'a, A, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, A>
 where
     A: Clone + 'a,
     F: Fn(A) -> bool + 'a,
 {
-    move |t: Tree<'a, A>| Tree::new(t.value(), filter_forest(f.clone())(t.children))
+    Tree::new(t.value(), filter_forest(f.clone(), t.children))
 }
 
-pub fn filter_forest<'a, A, F>(f: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
+pub fn filter_forest<'a, A, F>(f: Rc<F>, xs: Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
 where
     A: Clone + 'a,
     F: Fn(A) -> bool + 'a,
 {
-    move |xs: Vec<Tree<'a, A>>| {
-        xs.into_iter()
-            .filter(|x| f(outcome(x.clone())))
-            .map(|x| filter(f.clone())(x))
-            .collect()
-    }
+    xs.into_iter()
+        .filter(|x| f(outcome(x.clone())))
+        .map(|x| filter(f.clone(), x))
+        .collect()
 }
 
-pub fn map<'a, A, B, F>(f: Rc<F>) -> impl Fn(Tree<'a, A>) -> Tree<'a, B>
+pub fn map<'a, A, B, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(A) -> B,
 {
-    move |t| {
-        let x = f(t.value());
-        let xs = t.children.into_iter().map(|c| map(f.clone())(c)).collect();
-        Tree::new(x, xs)
-    }
+    let x = f(t.value());
+    let xs = t.children.into_iter().map(|c| map(f.clone(), c)).collect();
+    Tree::new(x, xs)
 }
 
 #[cfg(test)]
