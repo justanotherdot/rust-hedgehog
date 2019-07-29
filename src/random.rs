@@ -6,12 +6,6 @@ use crate::seed::Seed;
 use num::{FromPrimitive, Integer, ToPrimitive};
 use std::rc::Rc;
 
-// TODO I've used the F# naming here with the ctor `Random`
-// each impl (R, F#, and Haskell) differs in little ways
-// between each gen module so I'm trying to find a consistent
-// repr. between all three that makes sense to Rusts strengths.
-// TODO: Might make sense to have this as a Lazy.
-// TODO: Should the inner function here be an associated type?
 pub type Random<'a, A> = Rc<dyn Fn(Seed, Size) -> A + 'a>;
 
 pub fn unsafe_run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
