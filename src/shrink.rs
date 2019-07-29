@@ -42,39 +42,37 @@ fn unfold<A, B>(f: impl Fn(B) -> Option<(A, B)>, b0: B) -> Vec<A> {
 
 // We don't discriminate between LazyList and List
 // and we treat LazyList as Vec.
-pub fn removes<A, B>(k0: B) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+pub fn removes<A, B>(k0: B, xs0: Vec<A>) -> Vec<Vec<A>>
 where
     A: Clone,
     B: Integer + FromPrimitive + Copy,
 {
-    move |xs0: Vec<A>| {
-        fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
-        where
-            C: Integer + FromPrimitive + Copy,
-            D: Clone,
-        {
-            let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
-            let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
-            if k > n {
-                vec![]
-            } else if tl.is_empty() {
-                vec![vec![]]
-            } else {
-                let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
-                    .into_iter()
-                    .map(move |mut x| {
-                        let hd = hd.clone();
-                        x.push(hd);
-                        x
-                    })
-                    .collect();
-                inner.insert(0, tl);
-                inner
-            }
+    fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
+    where
+        C: Integer + FromPrimitive + Copy,
+        D: Clone,
+    {
+        let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
+        let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
+        if k > n {
+            vec![]
+        } else if tl.is_empty() {
+            vec![vec![]]
+        } else {
+            let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
+                .into_iter()
+                .map(move |mut x| {
+                    let hd = hd.clone();
+                    x.push(hd);
+                    x
+                })
+            .collect();
+        inner.insert(0, tl);
+        inner
         }
-        let gen_len = FromPrimitive::from_usize(xs0.len()).unwrap();
-        loop0(k0, gen_len, xs0)
     }
+    let gen_len = FromPrimitive::from_usize(xs0.len()).unwrap();
+    loop0(k0, gen_len, xs0)
 }
 
 pub fn elems<A, F>(shrink: Rc<F>) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
@@ -185,7 +183,7 @@ where
         .into_iter()
         .flat_map(move |k| {
             let xs = xs.clone();
-            removes(k)(xs)
+            removes(k, xs)
         })
         .collect()
 }
