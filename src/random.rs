@@ -6,12 +6,6 @@ use crate::seed::Seed;
 use num::{FromPrimitive, Integer, ToPrimitive};
 use std::rc::Rc;
 
-// TODO I've used the F# naming here with the ctor `Random`
-// each impl (R, F#, and Haskell) differs in little ways
-// between each gen module so I'm trying to find a consistent
-// repr. between all three that makes sense to Rusts strengths.
-// TODO: Might make sense to have this as a Lazy.
-// TODO: Should the inner function here be an associated type?
 pub type Random<'a, A> = Rc<dyn Fn(Seed, Size) -> A + 'a>;
 
 pub fn unsafe_run<'a, A>(seed: Seed, size: Size, r: Random<'a, A>) -> A {
@@ -54,11 +48,11 @@ where
     Rc::new(move |seed, size| unsafe_run(seed, size, f(size)))
 }
 
-pub fn resize<'a, A>(new_size: Size) -> impl Fn(Random<'a, A>) -> Random<'a, A>
+pub fn resize<'a, A>(new_size: Size, r: Random<'a, A>) -> Random<'a, A>
 where
     A: Clone + 'a,
 {
-    move |r: Random<'a, A>| Rc::new(move |seed, _| run(seed, new_size, r.clone()))
+    Rc::new(move |seed, _| run(seed, new_size, r.clone()))
 }
 
 pub fn integral<'a, A>(range: Range<'a, A>) -> Random<'a, A>
@@ -72,25 +66,21 @@ where
     })
 }
 
-pub fn bind<'a, A, B, F>(r0: Random<'a, A>) -> impl Fn(Rc<F>) -> Random<'a, B>
+pub fn bind<'a, A, B, F>(r0: Random<'a, A>, k: Rc<F>) -> Random<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(A) -> Random<'a, B> + 'a,
 {
-    let r1 = r0.clone();
-    move |k: Rc<F>| {
-        let r2 = r1.clone();
-        Rc::new(move |seed, size| {
-            let seed0 = seed.clone();
-            let (_seed1, seed2) = seed::split(seed0);
-            unsafe_run(
-                seed2,
-                size,
-                k(unsafe_run(seed.clone(), size.clone(), r2.clone())),
-            )
-        })
-    }
+    Rc::new(move |seed, size| {
+        let seed0 = seed.clone();
+        let (_seed1, seed2) = seed::split(seed0);
+        unsafe_run(
+            seed2,
+            size,
+            k(unsafe_run(seed.clone(), size.clone(), r0.clone())),
+        )
+    })
 }
 
 pub fn f64(range: Range<f64>) -> Random<f64> {
@@ -109,37 +99,34 @@ pub fn f32(range: Range<f32>) -> Random<f32> {
     })
 }
 
-pub fn replicate<'a, A>(times: usize) -> impl Fn(Random<'a, A>) -> Random<'a, Vec<A>>
+pub fn replicate<'a, A>(times: usize, r: Random<'a, A>) -> Random<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
-    move |r: Random<'a, A>| {
-        let r1 = r.clone();
-        Rc::new(move |seed0: Seed, size: Size| {
-            fn loop0<'b, B>(
-                r1: Random<'b, B>,
-                size1: Size,
-                seed: Seed,
-                k: usize,
-                mut acc: Vec<B>,
-            ) -> Vec<B>
-            where
-                B: Clone + 'b,
-            {
-                if k <= 0 {
-                    acc
-                } else {
-                    let (seed1, seed2) = seed::split(seed);
-                    let x = unsafe_run(seed1, size1, r1.clone());
-                    // TODO: This insert is a bit funky.
-                    // It is _probably_ faster to push and then reverse.
-                    acc.insert(0, x);
-                    loop0(r1, size1, seed2, k - 1, acc)
-                }
+    Rc::new(move |seed0: Seed, size: Size| {
+        fn loop0<'b, B>(
+            r1: Random<'b, B>,
+            size1: Size,
+            seed: Seed,
+            k: usize,
+            mut acc: Vec<B>,
+        ) -> Vec<B>
+        where
+            B: Clone + 'b,
+        {
+            if k <= 0 {
+                acc
+            } else {
+                let (seed1, seed2) = seed::split(seed);
+                let x = unsafe_run(seed1, size1, r1.clone());
+                // TODO: This insert is a bit funky.
+                // It is _probably_ faster to push and then reverse.
+                acc.insert(0, x);
+                loop0(r1, size1, seed2, k - 1, acc)
             }
-            loop0(r1.clone(), size, seed0, times, vec![])
-        })
-    }
+        }
+        loop0(r.clone(), size, seed0, times, vec![])
+    })
 }
 
 #[cfg(test)]
