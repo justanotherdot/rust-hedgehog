@@ -330,7 +330,7 @@ where
                     try_n(p3.clone(), r1.clone(), size1, Size(n.0 - 1))
                 }
             });
-            random::bind(r2)(f)
+            random::bind(r2, f)
         }
     };
     let p1 = p.clone();
@@ -366,7 +366,7 @@ where
             }
             Some(x) => random::constant(x),
         });
-        random::bind(filtered_rand)(f)
+        random::bind(filtered_rand, f)
     }
     from_random(loop0(p.clone(), g.clone(), ()))
 }
@@ -380,7 +380,7 @@ where
         None => random::constant(Tree::singleton(None)),
         Some(x) => random::constant(tree::map(Rc::new(move |v| Some(v)), x)),
     });
-    let r = random::bind(try_filter_random(p.clone(), to_random(g)))(f);
+    let r = random::bind(try_filter_random(p.clone(), to_random(g)), f);
     from_random(r)
 }
 
@@ -475,7 +475,7 @@ where
     from_random(random::sized(Rc::new(move |size| {
         let g = g.clone();
         let range = range.clone();
-        random::bind(random::integral(range.clone()))(Rc::new(move |k| {
+        random::bind(random::integral(range.clone()), Rc::new(move |k| {
             let g = g.clone();
             let range = range.clone();
             let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k)(to_random(g.clone()));
@@ -488,7 +488,7 @@ where
                 });
                 random::constant(tree::filter(f, r0))
             });
-            random::bind(r)(h)
+            random::bind(r, h)
         }))
     })))
 }

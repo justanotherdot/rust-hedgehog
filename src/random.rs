@@ -72,25 +72,21 @@ where
     })
 }
 
-pub fn bind<'a, A, B, F>(r0: Random<'a, A>) -> impl Fn(Rc<F>) -> Random<'a, B>
+pub fn bind<'a, A, B, F>(r0: Random<'a, A>, k: Rc<F>) -> Random<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
     F: Fn(A) -> Random<'a, B> + 'a,
 {
-    let r1 = r0.clone();
-    move |k: Rc<F>| {
-        let r2 = r1.clone();
-        Rc::new(move |seed, size| {
-            let seed0 = seed.clone();
-            let (_seed1, seed2) = seed::split(seed0);
-            unsafe_run(
-                seed2,
-                size,
-                k(unsafe_run(seed.clone(), size.clone(), r2.clone())),
-            )
-        })
-    }
+    Rc::new(move |seed, size| {
+        let seed0 = seed.clone();
+        let (_seed1, seed2) = seed::split(seed0);
+        unsafe_run(
+            seed2,
+            size,
+            k(unsafe_run(seed.clone(), size.clone(), r0.clone())),
+        )
+    })
 }
 
 pub fn f64(range: Range<f64>) -> Random<f64> {
