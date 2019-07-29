@@ -181,8 +181,9 @@ pub fn integral<'a, A>(range: Range<'a, A>) -> Gen<'a, A>
 where
     A: Copy + ToPrimitive + FromPrimitive + Integer + Clone + 'a,
 {
+    let range1 = range.clone();
     create(
-        Rc::new(shrink::towards(range::origin(range.clone()))),
+        Rc::new(move |x| shrink::towards(range::origin(range1.clone()), x)),
         random::integral(range),
     )
 }

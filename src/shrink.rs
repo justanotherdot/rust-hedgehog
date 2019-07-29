@@ -123,24 +123,21 @@ where
 }
 
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, A>(destination: A) -> impl Fn(A) -> Vec<A>
+pub fn towards<'a, A>(destination: A, x: A) -> Vec<A>
 where
     A: 'a,
     A: Integer + FromPrimitive + Copy,
 {
-    let towards_do = move |x: A| {
-        if destination == x {
-            vec![]
-        } else {
-            // We need to halve our operands before subtracting them as they may be using
-            // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
-            let two = FromPrimitive::from_isize(2).unwrap();
-            let diff = (x / two) - (destination / two);
+    if destination == x {
+        vec![]
+    } else {
+        // We need to halve our operands before subtracting them as they may be using
+        // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
+        let two = FromPrimitive::from_isize(2).unwrap();
+        let diff = (x / two) - (destination / two);
 
-            cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
-        }
-    };
-    towards_do
+        cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
+    }
 }
 
 // TODO: rename to monomorphic variant.
