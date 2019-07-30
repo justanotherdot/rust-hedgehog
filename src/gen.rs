@@ -622,7 +622,7 @@ mod test {
     #[test]
     fn create_works() {
         let rand_fn = Rc::new(|_, _| 3);
-        let g = create(shrink::towards(3).into(), rand_fn.clone());
+        let g = create(Rc::new(move |x| shrink::towards(3, x)), rand_fn.clone());
         let rand_fn1 = to_random(g);
         let global_seed = global();
         assert_eq!(

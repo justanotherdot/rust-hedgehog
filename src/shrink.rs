@@ -223,7 +223,7 @@ mod test {
 
     #[test]
     fn towards_works() {
-        let f = towards(3);
+        let f = |x| towards(3, x);
         assert_eq!(f(100), vec![3, 51, 76, 88, 94, 97, 99]);
     }
 
