@@ -27,9 +27,10 @@ where
     Box::new(cons_nub_do)
 }
 
-// TODO: This function needs testing and verification.
 // TODO: This function could just be a loop.
-fn unfold<A, B>(f: impl Fn(B) -> Option<(A, B)>, b0: B) -> Vec<A> {
+fn unfold<A, B, F>(f: F, b0: B) -> Vec<A>
+where F: Fn(B) -> Option<(A, B)>,
+{
     match f(b0) {
         Some((a, b1)) => {
             let mut v = unfold(f, b1);
@@ -143,28 +144,25 @@ where
 // TODO: rename to monomorphic variant.
 /// Shrink a floating-point number by edging towards a destination.
 /// Note we always try the destination first, as that is the optimal shrink.
-pub fn towards_float<'a, A: 'a>(destination: A) -> impl Fn(A) -> Vec<A>
+pub fn towards_float<'a, A: 'a>(destination: A, x: A) -> Vec<A>
 where
     A: Float + FromPrimitive + Copy,
 {
-    let towards_do = move |x: A| {
-        if destination == x {
-            Vec::new()
-        } else {
-            let diff = x - destination;
-            let go = |n| {
-                let x1 = x - n;
-                if x1 != x {
-                    let two = FromPrimitive::from_isize(2).unwrap();
-                    Some((x1, n / two))
-                } else {
-                    None
-                }
-            };
-            unfold(go, diff)
-        }
-    };
-    towards_do
+    if destination == x {
+        Vec::new()
+    } else {
+        let diff = x - destination;
+        let go = |n| {
+            let x1 = x - n;
+            if x1 != x {
+                let two = FromPrimitive::from_isize(2).unwrap();
+                Some((x1, n / two))
+            } else {
+                None
+            }
+        };
+        unfold(go, diff)
+    }
 }
 
 // n.b. previously `list'
@@ -229,7 +227,7 @@ mod test {
 
     #[test]
     fn towards_float_works() {
-        let f = towards_float(100.0);
+        let f = |x| towards_float(100.0, x);
 
         let expected = vec![
             100.0,
