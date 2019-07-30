@@ -83,7 +83,7 @@ where
     Tree::new(t, xs)
 }
 
-pub fn fold<A, X, B, F, G>(f: Rc<F>, g: Rc<G>, t: Tree<A>) -> B
+pub fn fold<A, X, B, F, G>(f: &F, g: &G, t: Tree<A>) -> B
 where
     A: Clone,
     B: Clone,
@@ -94,10 +94,10 @@ where
 {
     let x = t.value();
     let xs = t.children;
-    f(x, fold_forest(f.clone(), g.clone(), xs))
+    f(x, fold_forest(f, g, xs))
 }
 
-pub fn fold_forest<'a, A, X, B, F, G>(f: Rc<F>, g: Rc<G>, xs: Vec<Tree<A>>) -> X
+pub fn fold_forest<'a, A, X, B, F, G>(f: &F, g: &G, xs: Vec<Tree<A>>) -> X
 where
     A: Clone,
     B: Clone,
@@ -107,7 +107,7 @@ where
     G: Fn(Vec<B>) -> X + 'static,
 {
     g(xs.into_iter()
-      .map(|x| fold(f.clone(), g.clone(), x))
+      .map(|x| fold(f, g, x))
       .collect())
 }
 
