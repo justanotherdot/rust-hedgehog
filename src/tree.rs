@@ -89,12 +89,12 @@ where
     B: Clone,
     X: Clone,
     // TODO get rid of these static lifetimes
-    F: Fn(A) -> Rc<dyn Fn(X) -> B> + 'static,
+    F: Fn(A, X) -> B + 'static,
     G: Fn(Vec<B>) -> X + 'static,
 {
     let x = t.value();
     let xs = t.children;
-    f(x)(fold_forest(f.clone(), g.clone(), xs))
+    f(x, fold_forest(f.clone(), g.clone(), xs))
 }
 
 pub fn fold_forest<'a, A, X, B, F, G>(f: Rc<F>, g: Rc<G>, xs: Vec<Tree<A>>) -> X
@@ -103,7 +103,7 @@ where
     B: Clone,
     X: Clone,
     // TODO get rid of these static lifetimes
-    F: Fn(A) -> Rc<dyn Fn(X) -> B> + 'static,
+    F: Fn(A, X) -> B + 'static,
     G: Fn(Vec<B>) -> X + 'static,
 {
     g(xs.into_iter()
