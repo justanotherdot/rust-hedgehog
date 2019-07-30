@@ -42,72 +42,66 @@ fn unfold<A, B>(f: impl Fn(B) -> Option<(A, B)>, b0: B) -> Vec<A> {
 
 // We don't discriminate between LazyList and List
 // and we treat LazyList as Vec.
-pub fn removes<A, B>(k0: B) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+pub fn removes<A, B>(k0: B, xs0: Vec<A>) -> Vec<Vec<A>>
 where
     A: Clone,
     B: Integer + FromPrimitive + Copy,
 {
-    move |xs0: Vec<A>| {
-        fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
-        where
-            C: Integer + FromPrimitive + Copy,
-            D: Clone,
-        {
-            let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
-            let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
-            if k > n {
-                vec![]
-            } else if tl.is_empty() {
-                vec![vec![]]
-            } else {
-                let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
-                    .into_iter()
-                    .map(move |mut x| {
-                        let hd = hd.clone();
-                        x.push(hd);
-                        x
-                    })
-                    .collect();
-                inner.insert(0, tl);
-                inner
-            }
+    fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
+    where
+        C: Integer + FromPrimitive + Copy,
+        D: Clone,
+    {
+        let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
+        let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
+        if k > n {
+            vec![]
+        } else if tl.is_empty() {
+            vec![vec![]]
+        } else {
+            let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
+                .into_iter()
+                .map(move |mut x| {
+                    let hd = hd.clone();
+                    x.push(hd);
+                    x
+                })
+            .collect();
+        inner.insert(0, tl);
+        inner
         }
-        let gen_len = FromPrimitive::from_usize(xs0.len()).unwrap();
-        loop0(k0, gen_len, xs0)
     }
+    let gen_len = FromPrimitive::from_usize(xs0.len()).unwrap();
+    loop0(k0, gen_len, xs0)
 }
 
-pub fn elems<A, F>(shrink: Rc<F>) -> impl Fn(Vec<A>) -> Vec<Vec<A>>
+pub fn elems<A, F>(shrink: Rc<F>, xs00: Vec<A>) -> Vec<Vec<A>>
 where
     A: Clone,
     F: Fn(A) -> Vec<A>,
 {
-    move |xs00: Vec<A>| {
-        if xs00.is_empty() {
-            vec![]
-        } else {
-            let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
-            let x0 = xs01.get(0).unwrap();
-            let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
-            let mut ys: Vec<_> = shrink(x0.clone())
-                .into_iter()
-                .map(|x1| {
-                    let mut vs = vec![x1];
-                    vs.append(&mut xs0.clone());
-                    vs
-                })
-                .collect();
-            let mut zs: Vec<_> = elems(shrink.clone())(xs0)
-                .into_iter()
-                .map(|xs1| {
-                    let mut vs = vec![x0.clone()];
-                    vs.append(&mut xs1.clone());
-                    vs
-                })
-                .collect();
-            ys.append(&mut zs);
-            ys
-        }
+    if xs00.is_empty() {
+        vec![]
+    } else {
+        let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
+        let x0 = xs01.get(0).unwrap();
+        let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
+        let mut ys: Vec<_> = shrink(x0.clone())
+            .into_iter()
+            .map(|x1| {
+                let mut vs = vec![x1];
+                vs.append(&mut xs0.clone());
+                vs
+            }).collect();
+        let mut zs: Vec<_> = elems(shrink.clone(), xs0)
+            .into_iter()
+            .map(|xs1| {
+                let mut vs = vec![x0.clone()];
+                vs.append(&mut xs1.clone());
+                vs
+            }).collect();
+        ys.append(&mut zs);
+        ys
     }
 }
 
@@ -129,24 +123,21 @@ where
 }
 
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, A>(destination: A) -> impl Fn(A) -> Vec<A>
+pub fn towards<'a, A>(destination: A, x: A) -> Vec<A>
 where
     A: 'a,
     A: Integer + FromPrimitive + Copy,
 {
-    let towards_do = move |x: A| {
-        if destination == x {
-            vec![]
-        } else {
-            // We need to halve our operands before subtracting them as they may be using
-            // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
-            let two = FromPrimitive::from_isize(2).unwrap();
-            let diff = (x / two) - (destination / two);
+    if destination == x {
+        vec![]
+    } else {
+        // We need to halve our operands before subtracting them as they may be using
+        // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
+        let two = FromPrimitive::from_isize(2).unwrap();
+        let diff = (x / two) - (destination / two);
 
-            cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
-        }
-    };
-    towards_do
+        cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
+    }
 }
 
 // TODO: rename to monomorphic variant.
@@ -185,25 +176,23 @@ where
         .into_iter()
         .flat_map(move |k| {
             let xs = xs.clone();
-            removes(k)(xs)
+            removes(k, xs)
         })
         .collect()
 }
 
-pub fn sequence<'a, A, F>(merge: Rc<F>) -> impl Fn(Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
     A: Clone + 'a,
     // FIX: This is a bit silly because we don't have a LazyList type.
     F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
 {
-    move |xs| {
-        let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
-        let ys = merge(xs)
-            .into_iter()
-            .map(|v| sequence(merge.clone())(v))
-            .collect();
-        Tree::new(y, ys)
-    }
+    let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
+    let ys = merge(xs)
+        .into_iter()
+        .map(|v| sequence(merge.clone(), v))
+        .collect();
+    Tree::new(y, ys)
 }
 
 pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
@@ -213,10 +202,10 @@ where
     sequence(Rc::new(move |xs: Vec<Tree<'a, A>>| {
         let ys = xs.clone();
         let mut shrinks = vec(xs);
-        let mut elems = elems(Rc::new(move |t| tree::shrinks(t)))(ys);
+        let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
         shrinks.append(&mut elems);
         shrinks
-    }))(xs0)
+    }), xs0)
 }
 
 pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
@@ -224,8 +213,8 @@ where
     A: Clone + 'a,
 {
     sequence(Rc::new(move |xs| {
-        elems(Rc::new(move |t| tree::shrinks(t)))(xs)
-    }))(xs0)
+        elems(Rc::new(move |t| tree::shrinks(t)), xs)
+    }), xs0)
 }
 
 #[cfg(test)]
@@ -234,7 +223,7 @@ mod test {
 
     #[test]
     fn towards_works() {
-        let f = towards(3);
+        let f = |x| towards(3, x);
         assert_eq!(f(100), vec![3, 51, 76, 88, 94, 97, 99]);
     }
 

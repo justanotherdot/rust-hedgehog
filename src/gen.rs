@@ -181,8 +181,9 @@ pub fn integral<'a, A>(range: Range<'a, A>) -> Gen<'a, A>
 where
     A: Copy + ToPrimitive + FromPrimitive + Integer + Clone + 'a,
 {
+    let range1 = range.clone();
     create(
-        Rc::new(shrink::towards(range::origin(range.clone()))),
+        Rc::new(move |x| shrink::towards(range::origin(range1.clone()), x)),
         random::integral(range),
     )
 }
@@ -621,7 +622,7 @@ mod test {
     #[test]
     fn create_works() {
         let rand_fn = Rc::new(|_, _| 3);
-        let g = create(shrink::towards(3).into(), rand_fn.clone());
+        let g = create(Rc::new(move |x| shrink::towards(3, x)), rand_fn.clone());
         let rand_fn1 = to_random(g);
         let global_seed = global();
         assert_eq!(
