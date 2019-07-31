@@ -83,6 +83,28 @@ where
     Tree::new(t, xs)
 }
 
+pub fn fold_nonrec<A, X, B, F, G>(f: &F, g: &G, t: Tree<A>) -> B
+where
+    A: Clone,
+    B: Clone,
+    X: Clone,
+    // TODO get rid of these static lifetimes
+    F: Fn(A, X) -> B + 'static,
+    G: Fn(Vec<B>) -> X + 'static,
+{
+    let mut acc;
+    let mut ready = vec![root];
+    for tree in ready.into_iter() {
+        let x = t.value();
+        let xs = t.children;
+        f(x, fold_forest(f, g, xs))
+        // ref. fold_forest
+        //g(xs.into_iter()
+        //  .map(|x| fold(f, g, x))
+        //  .collect())
+    }
+}
+
 pub fn fold<A, X, B, F, G>(f: &F, g: &G, t: Tree<A>) -> B
 where
     A: Clone,
