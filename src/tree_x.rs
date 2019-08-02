@@ -1,31 +1,62 @@
-//use std::fmt::Debug;
+use std::fmt::Debug;
 
-pub struct TreeInner<'a, A, X> {
+pub struct TreeInner<'a, A, X>
+where A: Clone + Debug,
+{
     node: X,
     extract_value: &'a dyn Fn(X) -> A,
     extract_children: &'a dyn Fn(X) -> Vec<A>,
 }
 
-pub trait Treeish<A> {
+pub trait Treeish<A>
+where A: Clone + Debug
+{
     type X;
     type A;
 }
 
 impl<'a, A, X> Treeish<A> for TreeInner<'a, A, X>
+where A: Clone + Debug,
 {
     type X = X;
     type A = A;
 }
 
-pub fn id_tree<'a, A, X>(x: X) -> impl Treeish<A> + 'a
+pub fn id_tree<'a, A, X>(node: X) -> impl Treeish<A> + 'a
 where
     TreeInner<'a, X, X>: Treeish<A>,
-    X: 'a,
+    X: Clone + Debug + 'a,
+    A: Clone + Debug,
 {
     TreeInner {
-        node: x,
+        node,
         extract_value: &|x| x,
         extract_children: &|x| vec![x],
+    }
+}
+
+pub fn non_id_tree<'a, A, X>(node: X, extract_value: &'a dyn Fn(X) -> A, extract_children: &'a dyn Fn(X) -> Vec<A>) -> impl Treeish<A> + 'a
+where
+    TreeInner<'a, X, X>: Treeish<A>,
+    X: Clone + Debug + 'a,
+    A: Clone + Debug,
+{
+    TreeInner {
+        node,
+        extract_value,
+        extract_children,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let x = id_tree(12);
+        println!("{:?}", (x.extract_value)(x.node));
+        assert!(false);
     }
 }
 
