@@ -1,26 +1,37 @@
 use std::fmt::Debug;
 
+//#[derive(Clone)]
+//pub struct Tree<'a, A>
+//where
+    //A: Debug + Clone,
+//{
+    //node: A,
+    //extract_value: &'a dyn Fn(A) -> A,
+    //extract_children: &'a dyn Fn(A) -> Vec<A>,
+//}
 
-#[derive(Clone)]
-pub struct Tree<'a, A>
+//impl<'a, A> Tree<'a, A>
+//where
+    //A: Debug + Clone,
+//{
+    //pub fn new(node: A) -> Self {
+        //let extract_value = &|x: A| x;
+        //let extract_children = &|x: A| vec![x];
+        //Self { node, extract_value, extract_children }
+    //}
+//}
+
+
+pub trait Tree<A>
 where
     A: Debug + Clone,
 {
-    node: A,
-    extract_value: &'a dyn Fn(A) -> A,
-    extract_children: &'a dyn Fn(A) -> Vec<A>,
+    type X;
+
+    fn value(x: Self::X) -> A;
+    fn children(x: Self::X) -> Vec<A>;
 }
 
-impl<'a, A> Tree<'a, A>
-where
-    A: Debug + Clone,
-{
-    pub fn new(node: A) -> Self {
-        let extract_value = &|x: A| x;
-        let extract_children = &|x: A| vec![x];
-        Self { node, extract_value, extract_children }
-    }
-}
 
 //impl<'a, A> Tree<'a, A>
 //where
