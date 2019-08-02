@@ -22,7 +22,7 @@ use std::fmt::Debug;
 //}
 
 
-pub trait Tree<A>
+pub trait Treeish<A>
 where
     A: Debug + Clone,
 {
@@ -30,6 +30,35 @@ where
 
     fn value(x: Self::X) -> A;
     fn children(x: Self::X) -> Vec<A>;
+}
+
+pub struct Node<X>(X);
+
+pub struct Tree<A> {
+    node: std::marker::PhantomData<A>,
+}
+
+impl<A> Treeish<A> for Tree<A>
+where
+    A: Clone + Debug,
+{
+    type X = Node<A>;
+
+    fn value(x: Self::X) -> A {
+        x.0
+    }
+
+    fn children(x: Self::X) -> Vec<A> {
+        vec![x.0]
+    }
+}
+
+impl<A> Tree<A> {
+    pub fn new(node: Node<A>) -> Self {
+        Tree {
+            node: std::marker::PhantomData
+        }
+    }
 }
 
 
