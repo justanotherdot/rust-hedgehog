@@ -1,50 +1,42 @@
 use std::fmt::Debug;
 
-pub struct TreeInner<'a, A, X>
-where A: Clone + Debug,
-{
-    node: X,
-    extract_value: &'a dyn Fn(X) -> A,
-    extract_children: &'a dyn Fn(X) -> Vec<A>,
+pub trait Outcome {
+    type Seed;
 }
 
-pub trait Treeish<A>
-where A: Clone + Debug
-{
-    type X;
-    type A;
+#[derive(Debug, Clone)]
+struct Usd(u32);
+
+impl Outcome for Usd {
+    type Seed = u32;
 }
 
-impl<'a, A, X> Treeish<A> for TreeInner<'a, A, X>
-where A: Clone + Debug,
-{
-    type X = X;
-    type A = A;
+impl Outcome for u32 {
+    type Seed = u32;
 }
 
-pub fn id_tree<'a, A, X>(node: X) -> impl Treeish<A> + 'a
-where
-    TreeInner<'a, X, X>: Treeish<A>,
-    X: Clone + Debug + 'a,
-    A: Clone + Debug,
+// TODO: Still probably ought to be an Rc as opposed to refs?
+pub struct Tree<'a, A>
+where A: Clone + Debug + Outcome,
 {
-    TreeInner {
-        node,
-        extract_value: &|x| x,
-        extract_children: &|x| vec![x],
-    }
+    node: A::Seed,
+    extract_value: &'a dyn Fn(A::Seed) -> A,
+    extract_children: &'a dyn Fn(A::Seed) -> Vec<A>,
 }
 
-pub fn non_id_tree<'a, A, X>(node: X, extract_value: &'a dyn Fn(X) -> A, extract_children: &'a dyn Fn(X) -> Vec<A>) -> impl Treeish<A> + 'a
-where
-    TreeInner<'a, X, X>: Treeish<A>,
-    X: Clone + Debug + 'a,
-    A: Clone + Debug,
+impl<'a, A> Tree<'a, A>
+where A: Clone + Debug + Outcome
 {
-    TreeInner {
-        node,
-        extract_value,
-        extract_children,
+    pub fn new(
+        node: A::Seed,
+        extract_value: &'a dyn Fn(A::Seed) -> A,
+        extract_children: &'a dyn Fn(A::Seed) -> Vec<A>,
+    ) -> Self {
+        Tree {
+            node,
+            extract_value,
+            extract_children,
+        }
     }
 }
 
@@ -54,7 +46,11 @@ mod test {
 
     #[test]
     fn it_works() {
-        let x = id_tree(12);
+        let x = Tree::new(
+            12,
+            &|x| Usd(x),
+            &|x| vec![Usd(x)],
+        );
         println!("{:?}", (x.extract_value)(x.node));
         assert!(false);
     }
