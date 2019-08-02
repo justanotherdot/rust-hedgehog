@@ -1,32 +1,23 @@
-use std::rc::Rc;
 use std::fmt::Debug;
 
-pub trait Id: Debug {}
 
-impl<A: Debug + Clone + Sized> Id for A {}
-
-fn id(x: impl Id) -> impl Id {
-  x
-}
-
-//#[derive(Clone, Debug)]
-pub struct Tree<'a, A>//, A>
+#[derive(Clone)]
+pub struct Tree<'a, A>
 where
     A: Debug + Clone,
 {
-    node: Rc<dyn Id + 'a>,
-    extract_value: Rc<dyn Fn(dyn Id) -> A>,
-    extract_children: Rc<dyn Fn(dyn Id) -> Vec<A>>,
+    node: A,
+    extract_value: &'a dyn Fn(A) -> A,
+    extract_children: &'a dyn Fn(A) -> Vec<A>,
 }
 
 impl<'a, A> Tree<'a, A>
 where
     A: Debug + Clone,
 {
-    pub fn new(node: impl Id + 'a) -> Self {
-        let node = Rc::new(node);
-        let extract_value = Rc::new(|x| x);
-        let extract_children = Rc::new(|x| vec![]);
+    pub fn new(node: A) -> Self {
+        let extract_value = &|x: A| x;
+        let extract_children = &|x: A| vec![x];
         Self { node, extract_value, extract_children }
     }
 }
