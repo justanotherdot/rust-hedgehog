@@ -1,21 +1,35 @@
-use lazy::Lazy;
-use std::borrow::Borrow;
 use std::rc::Rc;
 use std::fmt::Debug;
 
-pub trait Id: Debug + Clone {}
+pub trait Id: Debug {}
 
-#[derive(Clone, Debug)]
-pub struct Tree<'a, A>
-where
-    A: Clone,
-{
-    node: Rc<dyn Id + 'a>,
-    extract_value: Fn(impl Id) -> A,
-    extract_children: Fn(impl Id) -> Vec<A>,
+impl<A: Debug + Clone + Sized> Id for A {}
+
+fn id(x: impl Id) -> impl Id {
+  x
 }
 
+//#[derive(Clone, Debug)]
+pub struct Tree<'a, A>//, A>
+where
+    A: Debug + Clone,
+{
+    node: Rc<dyn Id + 'a>,
+    extract_value: Rc<dyn Fn(dyn Id) -> A>,
+    extract_children: Rc<dyn Fn(dyn Id) -> Vec<A>>,
+}
 
+impl<'a, A> Tree<'a, A>
+where
+    A: Debug + Clone,
+{
+    pub fn new(node: impl Id + 'a) -> Self {
+        let node = Rc::new(node);
+        let extract_value = Rc::new(|x| x);
+        let extract_children = Rc::new(|x| vec![]);
+        Self { node, extract_value, extract_children }
+    }
+}
 
 //impl<'a, A> Tree<'a, A>
 //where
