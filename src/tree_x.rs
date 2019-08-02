@@ -1,65 +1,46 @@
-use std::fmt::Debug;
+//use std::fmt::Debug;
 
-//#[derive(Clone)]
-//pub struct Tree<'a, A>
-//where
-    //A: Debug + Clone,
-//{
-    //node: A,
-    //extract_value: &'a dyn Fn(A) -> A,
-    //extract_children: &'a dyn Fn(A) -> Vec<A>,
-//}
+pub struct TreeInner<'a, A, X> {
+    node: X,
+    extract_value: &'a dyn Fn(X) -> A,
+    extract_children: &'a dyn Fn(X) -> Vec<A>,
+}
 
-//impl<'a, A> Tree<'a, A>
+pub trait Treeish<A> {
+    type X;
+    type A;
+}
+
+impl<'a, A, X> Treeish<A> for TreeInner<'a, A, X>
+{
+    type X = X;
+    type A = A;
+}
+
+pub fn id_tree<'a, A, X>(x: X) -> impl Treeish<A> + 'a
+where
+    TreeInner<'a, X, X>: Treeish<A>,
+    X: 'a,
+{
+    TreeInner {
+        node: x,
+        extract_value: &|x| x,
+        extract_children: &|x| vec![x],
+    }
+}
+
+//impl<A> Tree<A>
 //where
-    //A: Debug + Clone,
+    //A: Clone + Debug,
 //{
     //pub fn new(node: A) -> Self {
-        //let extract_value = &|x: A| x;
-        //let extract_children = &|x: A| vec![x];
-        //Self { node, extract_value, extract_children }
+        //Tree { node }
+    //}
+
+    //pub fn outcome(&self) -> A {
+        //self.node.clone()
     //}
 //}
-
-
-pub trait Treeish<A>
-where
-    A: Debug + Clone,
-{
-    type X;
-
-    fn value(x: Self::X) -> A;
-    fn children(x: Self::X) -> Vec<A>;
-}
-
-pub struct Node<X>(X);
-
-pub struct Tree<A> {
-    node: std::marker::PhantomData<A>,
-}
-
-impl<A> Treeish<A> for Tree<A>
-where
-    A: Clone + Debug,
-{
-    type X = Node<A>;
-
-    fn value(x: Self::X) -> A {
-        x.0
-    }
-
-    fn children(x: Self::X) -> Vec<A> {
-        vec![x.0]
-    }
-}
-
-impl<A> Tree<A> {
-    pub fn new(node: Node<A>) -> Self {
-        Tree {
-            node: std::marker::PhantomData
-        }
-    }
-}
 
 
 //impl<'a, A> Tree<'a, A>
