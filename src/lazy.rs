@@ -43,6 +43,28 @@ where
         self.force();
         self.value.clone().into_inner().unwrap()
     }
+
+    pub fn map<B, F>(self, f: Rc<F>) -> Lazy<'a, B>
+    where
+        A: Clone + 'a,
+        B: Clone + 'a,
+        F: Fn(A) -> B + 'a,
+    {
+        map(f, self)
+    }
+}
+
+pub fn map<'a, A, B, F>(f: Rc<F>, l: Lazy<'a, A>) -> Lazy<'a, B>
+where
+    A: Clone + 'a,
+    B: Clone + 'a,
+    F: Fn(A) -> B + 'a,
+{
+    let closure = move || {
+        let v = l.value();
+        f(v)
+    };
+    Lazy::from_closure(closure)
 }
 
 impl<'a, A> Debug for Lazy<'a, A>
