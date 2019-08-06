@@ -1,6 +1,8 @@
 use gen::Gen;
 use std::rc::Rc;
 use std::fmt::Display;
+use crate::tree::Tree;
+use crate::tree;
 
 #[derive(Clone)]
 pub struct Journal(Vec<String>);
@@ -374,5 +376,28 @@ mod property {
             A: Clone + Display + 'a,
     {
         for_all(gen, &|x: A| success(x))
+    }
+
+    // TODO: isize -> Shrinks
+    fn take_smallest<A>(t: Tree<(Journal, Result<A>)>, nshrinks: isize) -> Status
+        where
+            A: Clone,
+    {
+        let (journal, x) = t.value();
+        let xs = t.children;
+        match x {
+            Result::Failure =>
+                match xs.into_iter().find(|x| result::is_failure(tree::outcome(x).1)) {
+                    None =>
+                        Status::Failed((nshrinks, journal)),
+                    Some(tree) =>
+                        take_smallest(tree, nshrinks+1),
+                }
+                ,
+            Result::Discard =>
+                Status::GaveUp,
+            Result::Success(_) =>
+                Status::Ok,
+        }
     }
 }
