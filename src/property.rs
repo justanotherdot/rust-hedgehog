@@ -1,5 +1,6 @@
 use gen::Gen;
 use std::rc::Rc;
+use std::fmt::Display;
 
 #[derive(Clone)]
 pub struct Journal(Vec<String>);
@@ -353,5 +354,25 @@ mod property {
             B: Clone + 'a,
     {
         from_gen(bind_gen(to_gen(m), move |x| to_gen(k(x))))
+    }
+
+    pub fn for_all<'a, F, A, B>(gen: Gen<'a, A>, k: &'a F) -> Property<'a, B>
+        where
+            F: Fn(A) -> Property<'a, B> + 'a,
+            A: Clone + Display + 'a,
+            B: Clone + 'a,
+    {
+        let prepend = Rc::new(move |x: A| {
+            // pretend things don't panic.
+            to_gen(bind(counter_example(&|| format!("{}", x)), move |_| k(x.clone())))
+        });
+        from_gen(gen::bind(gen, prepend))
+    }
+
+    pub fn for_all_tick<'a, A>(gen: Gen<'a, A>) -> Property<'a, A>
+        where
+            A: Clone + Display + 'a,
+    {
+        for_all(gen, &|x: A| success(x))
     }
 }
