@@ -3,6 +3,11 @@ use std::rc::Rc;
 use std::fmt::Display;
 use crate::tree::Tree;
 use crate::tree;
+use crate::seed;
+use crate::random;
+use crate::random::Random;
+use crate::range::Size;
+use crate::seed::Seed;
 
 #[derive(Clone)]
 pub struct Journal(Vec<String>);
@@ -399,5 +404,69 @@ mod property {
             Result::Success(_) =>
                 Status::Ok,
         }
+    }
+
+    // TODO: isize
+    pub fn report_tick(n: isize, p: Property<()>) -> Report {
+        let random = gen::to_random(to_gen(p));
+        let next_size = |size: Size| {
+            if size.0 >= 100 {
+                Size(1)
+            } else {
+                Size(size.0 + 1)
+            }
+        };
+
+
+        // TODO: isize -> tests, isize -> disacards
+        pub fn loop0<'a, F>(
+            seed: Seed,
+            size: Size,
+            tests: isize,
+            discards: isize,
+            n: isize,
+            random: Random<'a, Tree<'a, (Journal, Result<()>)>>,
+            next_size: F
+        ) -> Report
+            where
+                F: Fn(Size) -> Size,
+        {
+            if tests == n {
+                Report {
+                    tests,
+                    discards,
+                    status: Status::Ok,
+                }
+            } else if discards >= 100 {
+                Report {
+                    tests,
+                    discards,
+                    status: Status::GaveUp,
+                }
+            } else {
+                let (seed1, seed2) = seed::split(seed);
+                let result = random::run(seed1, size, random.clone());
+
+                match tree::outcome(&result).1 {
+                    Result::Failure =>
+                        Report {
+                            tests: tests + 1,
+                            discards,
+                            status: take_smallest(result, 0),
+                        },
+                    Result::Success(()) =>
+                        loop0(seed2, next_size(size), tests + 1, discards, n, random, next_size),
+                    Result::Discard =>
+                        loop0(seed2, next_size(size), tests, discards + 1, n, random, next_size),
+                }
+            }
+        }
+
+        let seed = seed::random();
+        loop0(seed, Size(1), 0, 0, n, random, next_size)
+    }
+
+    pub fn report(p: Property<()>) -> Report {
+        report_tick(100, p)
     }
 }
