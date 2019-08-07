@@ -38,7 +38,7 @@ pub struct Report {
     pub status: Status,
 }
 
-mod tuple {
+pub mod tuple {
     pub fn first<'a, F, A, B, C>(f: F, x: A, y: B) -> (C, B)
         where A: Clone,
               B: Clone,
@@ -58,7 +58,7 @@ mod tuple {
     }
 }
 
-mod journal {
+pub mod journal {
     use super::*;
 
     pub fn from_list(xs: Vec<String>) -> Journal {
@@ -90,7 +90,7 @@ mod journal {
     }
 }
 
-mod result {
+pub mod result {
     use super::*;
 
     pub fn map<F, A, B>(f: &F, r: Result<A>) -> Result<B>
@@ -134,13 +134,13 @@ mod result {
                 true,
             Result::Discard =>
                 false,
-            Result::Success(x) =>
+            Result::Success(_x) =>
                 false,
         }
     }
 }
 
-mod pretty {
+pub mod pretty {
     use super::*;
 
     // isize -> Tests
@@ -201,7 +201,7 @@ mod pretty {
     }
 }
 
-mod report {
+pub mod report {
     use super::*;
 
     pub fn render(report: Report) -> String {
@@ -230,7 +230,7 @@ mod report {
     //}
 }
 
-mod property {
+pub mod property {
     use super::*;
     use crate::gen;
 
