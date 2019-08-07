@@ -77,12 +77,12 @@ mod journal {
         Journal(vec![x])
     }
 
-    pub fn delayed_singleton<F>(x: &F) -> Journal
-        where F: Fn() -> String,
-    {
-        eprintln!("TODO: delayed_singleton");
-        unimplemented!()
-    }
+    //pub fn delayed_singleton<F>(x: &F) -> Journal
+        //where F: Fn() -> String,
+    //{
+        //eprintln!("TODO: delayed_singleton");
+        //unimplemented!()
+    //}
 
     pub fn append(Journal(xs): Journal, Journal(ys): Journal) -> Journal {
         let zs = xs.into_iter().chain(ys).collect();
@@ -93,7 +93,7 @@ mod journal {
 mod result {
     use super::*;
 
-    pub fn map<F, A, B>(f: F, r: Result<A>) -> Result<B>
+    pub fn map<F, A, B>(f: &F, r: Result<A>) -> Result<B>
         where F: Fn(A) -> B,
               A: Clone,
               B: Clone,
@@ -260,13 +260,16 @@ mod property {
     // TODO
     // using
 
-    pub fn filter<'a, F, A>(p: F, m: Property<'a, A>) -> Property<'a, A>
-        where A: Clone,
-              F: Fn(A) -> bool,
+    pub fn filter<'a, F, A>(p: &'a F, m: Property<'a, A>) -> Property<'a, A>
+        where A: Clone + 'a,
+              F: Fn(&A) -> bool + 'a,
     {
         // TODO: Tuple mod.
-        //from_gen(gen::map(Rc::new(move |x| second(result::filter(p(x)))), to_gen(m)))
-        unimplemented!()
+        from_gen(gen::map(Rc::new(move |x: (Journal, Result<A>)| {
+            tuple::second(|b| {
+                result::filter(p, b)
+            }, x.0, x.1)
+        }), to_gen(m)))
     }
 
     pub fn from_result<'a, A>(x: Result<A>) -> Property<'a, A>
@@ -304,29 +307,37 @@ mod property {
     pub fn counter_example<'a, F>(msg: &F) -> Property<'a, ()>
         where F: Fn() -> String,
     {
-        let inner = (journal::delayed_singleton(msg), Result::Success(()));
+        // TODO: was delayed_singleton, now just singleton.
+        let inner = (journal::singleton(msg()), Result::Success(()));
         from_gen(gen::constant(inner))
     }
 
     fn map_gen<'a, A, B, F>(f: F, x: Property<'a, A>) -> Property<'a, B>
-        where F: Fn(Gen<'a, (Journal, Result<A>)>) -> Gen<(Journal, Result<B>)>,
-              A: Clone,
-              B: Clone,
+        where
+            F: Fn(Gen<'a, (Journal, Result<A>)>) -> Gen<(Journal, Result<B>)>,
+            A: Clone,
+            B: Clone,
     {
         from_gen(f(to_gen(x)))
     }
 
-    pub fn map<'a, F, A, B>(f: F, x: Property<'a, A>) -> Property<'a, B>
-        where F: Fn(A) -> B,
-              A: Clone,
-              B: Clone,
+    pub fn map<'a, F, A, B>(f: &'a F, x: Property<'a, A>) -> Property<'a, B>
+        where
+            F: Fn(A) -> B,
+            A: Clone + 'a,
+            B: Clone + 'a,
     {
-        //let composed = |f, x| {
-            //map_gen(f, gen::map(f, second(result::map(f, y))))
-        //};
-        //composed(f, x)
-        // TODO: Needs tuple module.
-        unimplemented!()
+        map_gen(
+            move |g1| {
+                gen::map(
+                    Rc::new(move |g2: (Journal, Result<A>)| {
+                        tuple::second(|b| result::map(f, b), g2.0, g2.1)
+                    }),
+                    g1
+                )
+            },
+            x
+        )
     }
 
     fn bind_gen<'a, F, A, B>(m: Gen<'a, (Journal, Result<A>)>, k: F) -> Gen<'a, (Journal, Result<B>)>
