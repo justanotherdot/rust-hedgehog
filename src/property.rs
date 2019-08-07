@@ -469,4 +469,31 @@ mod property {
     pub fn report(p: Property<()>) -> Report {
         report_tick(100, p)
     }
+
+    // TODO: isize -> tests
+    pub fn check_tick(n: isize, p: Property<()>) {
+        report_tick(n, p);
+    }
+
+    pub fn check(p: Property<()>) {
+        report(p);
+    }
+
+    pub fn check_bool(g: Property<bool>) {
+        check(bind(g, from_bool))
+    }
+
+    // TODO: isize -> tests
+    pub fn check_bool_tick(n: isize, g: Property<bool>) {
+        check_tick(n, bind(g, from_bool))
+    }
+
+    // TODO: isize -> tests
+    pub fn print_tick(n: isize, p: Property<()>) {
+        println!("{}", report::render(report_tick(n, p)))
+    }
+
+    pub fn print(p: Property<()>) {
+        print!("{}", report::render(report(p)))
+    }
 }
