@@ -395,15 +395,16 @@ pub mod property {
     }
 
     // TODO: isize -> Shrinks
-    fn take_smallest<A>(t: Tree<(Journal, Result<A>)>, nshrinks: isize) -> Status
+    fn take_smallest<'a, A>(t: Tree<(Journal, Result<A>)>, nshrinks: isize) -> Status
         where
-            A: Clone,
+            // TODO: Remove the need for this 'static'.
+            A: Clone + 'static,
     {
         let (journal, x) = t.value();
         let xs = t.children;
         match x {
             Result::Failure =>
-                match xs.into_iter().find(|x| result::is_failure(tree::outcome(x).1)) {
+                match xs.value().into_iter().find(|x| result::is_failure(tree::outcome(x).1)) {
                     None =>
                         Status::Failed((nshrinks, journal)),
                     Some(tree) =>
