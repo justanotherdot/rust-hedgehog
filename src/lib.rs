@@ -11,3 +11,4 @@ pub mod range;
 pub mod seed;
 pub mod shrink;
 pub mod tree;
+pub mod property;
