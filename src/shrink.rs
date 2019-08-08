@@ -32,14 +32,18 @@ fn unfold<A, B, F>(f: F, b0: B) -> Vec<A>
 where
     F: Fn(B) -> Option<(A, B)>,
 {
-    match f(b0) {
-        Some((a, b1)) => {
-            let mut v = unfold(f, b1);
-            v.insert(0, a); // XXX Always shifts values over on each fn call.
-            v
+    let mut acc = vec![];
+    let mut b = b0;
+    loop {
+        if let Some((a, b1)) = f(b) {
+            acc.push(a);
+            b = b1;
+            continue;
+        } else {
+            break;
         }
-        None => vec![],
     }
+    acc
 }
 
 // We don't discriminate between LazyList and List
