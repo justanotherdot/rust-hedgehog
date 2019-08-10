@@ -192,11 +192,13 @@ where
     // FIX: This is a bit silly because we don't have a LazyList type.
     F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
 {
+    println!("shrink::sequence");
     let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
-    let ys = merge(xs)
-        .into_iter()
-        .map(|v| sequence(merge.clone(), v))
-        .collect();
+    //let ys = merge(xs)
+    //.into_iter()
+    //.map(|v| sequence(merge.clone(), v))
+    //.collect();
+    let ys = vec![];
     Tree::new(y, ys)
 }
 
@@ -204,6 +206,7 @@ pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
     A: Clone + std::fmt::Debug + 'a,
 {
+    println!("shrink::sequence_list");
     sequence(
         Rc::new(move |xs: Vec<Tree<'a, A>>| {
             let ys = xs.clone();

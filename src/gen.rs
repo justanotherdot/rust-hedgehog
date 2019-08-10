@@ -112,6 +112,7 @@ where
     B: Clone + 'a,
     F: Fn(A) -> B + 'a,
 {
+    println!("gen::map");
     map_tree(Rc::new(move |x| tree::map(f.clone(), x)), g)
 }
 
@@ -170,6 +171,7 @@ where
     A: Clone + 'a,
     F: Fn(Size) -> Gen<'a, A> + 'a,
 {
+    println!("gen::sized");
     from_random(random::sized(Rc::new(move |s: Size| to_random(f(s)))))
 }
 
@@ -501,6 +503,7 @@ pub fn vec<'a, A>(range: Range<'a, usize>, g: Gen<'a, A>) -> Gen<'a, Vec<A>>
 where
     A: Clone + std::fmt::Debug + 'a,
 {
+    println!("gen::vec");
     from_random(random::sized(Rc::new(move |size| {
         let g = g.clone();
         let range = range.clone();
@@ -528,6 +531,7 @@ where
 /// Feeding this function anything other than `unicode` may result in errors as this checks for
 /// valid UTF-8 on construction (per Rust's `String` type).
 pub fn string<'a>(range: Range<'a, usize>, g: Gen<'a, char>) -> Gen<'a, String> {
+    println!("gen::string");
     map(
         Rc::new(move |cs: Vec<char>| {
             let mut s = String::with_capacity(cs.len());
