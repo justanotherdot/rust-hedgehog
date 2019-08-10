@@ -188,7 +188,7 @@ where
 
 pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone + std::fmt::Debug + 'a,
     // FIX: This is a bit silly because we don't have a LazyList type.
     F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
 {
@@ -202,7 +202,7 @@ where
 
 pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone + std::fmt::Debug + 'a,
 {
     sequence(
         Rc::new(move |xs: Vec<Tree<'a, A>>| {
@@ -218,7 +218,7 @@ where
 
 pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone + std::fmt::Debug + 'a,
 {
     sequence(
         Rc::new(move |xs| elems(Rc::new(move |t| tree::shrinks(t)), xs)),

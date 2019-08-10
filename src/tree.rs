@@ -1,7 +1,7 @@
 use lazy::Lazy;
 use std::borrow::Borrow;
 use std::fmt;
-use std::fmt::{Debug, Display, Write};
+use std::fmt::{Debug, Display};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -266,16 +266,14 @@ where
 
 impl<'a, A> Display for Tree<'a, A>
 where
-    A: Copy + Debug,
+    A: Clone + Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error>
     where
         A: Debug,
     {
         for line in render_tree_lines(100, self) {
-            // surely a better way for direct Strings
-            f.write_str(&line)?;
-            f.write_char('\n')?;
+            f.write_fmt(format_args!("{}\n", line))?;
         }
 
         Ok(())

@@ -499,7 +499,7 @@ where
 
 pub fn vec<'a, A>(range: Range<'a, usize>, g: Gen<'a, A>) -> Gen<'a, Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone + std::fmt::Debug + 'a,
 {
     from_random(random::sized(Rc::new(move |size| {
         let g = g.clone();
