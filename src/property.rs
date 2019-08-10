@@ -1,13 +1,13 @@
-use gen::Gen;
-use std::rc::Rc;
-use std::fmt::Display;
-use crate::tree::Tree;
-use crate::tree;
-use crate::seed;
 use crate::random;
 use crate::random::Random;
 use crate::range::Size;
+use crate::seed;
 use crate::seed::Seed;
+use crate::tree;
+use crate::tree::Tree;
+use gen::Gen;
+use std::fmt::Display;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub struct Journal(Vec<String>);
@@ -15,7 +15,8 @@ pub struct Journal(Vec<String>);
 // TODO: Rename. Maybe TestResult?
 #[derive(Clone)]
 pub enum Result<A>
-where A: Clone
+where
+    A: Clone,
 {
     Failure,
     Discard,
@@ -24,7 +25,8 @@ where A: Clone
 
 #[derive(Clone)]
 pub struct Property<'a, A>(Gen<'a, (Journal, Result<A>)>)
-where A: Clone;
+where
+    A: Clone;
 
 pub enum Status {
     Failed((isize, Journal)), // isize -> Shrinks
@@ -33,26 +35,28 @@ pub enum Status {
 }
 
 pub struct Report {
-    pub tests: isize, // isize -> tests
+    pub tests: isize,    // isize -> tests
     pub discards: isize, // isize -> discards
     pub status: Status,
 }
 
 pub mod tuple {
     pub fn first<'a, F, A, B, C>(f: F, x: A, y: B) -> (C, B)
-        where A: Clone,
-              B: Clone,
-              C: Clone,
-              F: Fn(A) -> C,
+    where
+        A: Clone,
+        B: Clone,
+        C: Clone,
+        F: Fn(A) -> C,
     {
         (f(x), y)
     }
 
     pub fn second<'a, F, A, B, C>(f: F, x: A, y: B) -> (A, C)
-        where A: Clone,
-              B: Clone,
-              C: Clone,
-              F: Fn(B) -> C,
+    where
+        A: Clone,
+        B: Clone,
+        C: Clone,
+        F: Fn(B) -> C,
     {
         (x, f(y))
     }
@@ -78,10 +82,10 @@ pub mod journal {
     }
 
     //pub fn delayed_singleton<F>(x: &F) -> Journal
-        //where F: Fn() -> String,
+    //where F: Fn() -> String,
     //{
-        //eprintln!("TODO: delayed_singleton");
-        //unimplemented!()
+    //eprintln!("TODO: delayed_singleton");
+    //unimplemented!()
     //}
 
     pub fn append(Journal(xs): Journal, Journal(ys): Journal) -> Journal {
@@ -94,48 +98,44 @@ pub mod result {
     use super::*;
 
     pub fn map<F, A, B>(f: &F, r: Result<A>) -> Result<B>
-        where F: Fn(A) -> B,
-              A: Clone,
-              B: Clone,
+    where
+        F: Fn(A) -> B,
+        A: Clone,
+        B: Clone,
     {
         match r {
-            Result::Failure =>
-                Result::Failure,
-            Result::Discard =>
-                Result::Discard,
-            Result::Success(x) =>
-                Result::Success(f(x)),
+            Result::Failure => Result::Failure,
+            Result::Discard => Result::Discard,
+            Result::Success(x) => Result::Success(f(x)),
         }
     }
 
     pub fn filter<F, A>(f: F, r: Result<A>) -> Result<A>
-        where F: Fn(&A) -> bool,
-              A: Clone,
+    where
+        F: Fn(&A) -> bool,
+        A: Clone,
     {
         match r {
-            Result::Failure =>
-                Result::Failure,
-            Result::Discard =>
-                Result::Discard,
-            Result::Success(x) =>
+            Result::Failure => Result::Failure,
+            Result::Discard => Result::Discard,
+            Result::Success(x) => {
                 if f(&x) {
                     Result::Success(x)
                 } else {
                     Result::Discard
-                },
+                }
+            }
         }
     }
 
     pub fn is_failure<A>(r: Result<A>) -> bool
-        where A: Clone,
+    where
+        A: Clone,
     {
         match r {
-            Result::Failure =>
-                true,
-            Result::Discard =>
-                false,
-            Result::Success(_x) =>
-                false,
+            Result::Failure => true,
+            Result::Discard => false,
+            Result::Success(_x) => false,
         }
     }
 }
@@ -184,19 +184,31 @@ pub mod pretty {
 
     // isize -> Tests, isize -> Discards
     pub fn render_gave_up(tests: isize, discards: isize) -> String {
-        format!("*** Gave up after {}, passed {}.", render_discards(discards), render_tests(tests))
+        format!(
+            "*** Gave up after {}, passed {}.",
+            render_discards(discards),
+            render_tests(tests)
+        )
     }
 
     // isize -> Tests, isize -> Discards, isize -> Shrinks
-    pub fn render_failed(tests: isize, discards: isize, shrinks: isize, journal: Journal) -> String {
-        let mut s = format!("*** Failed! Falsifiable (after {}{}{}):",
+    pub fn render_failed(
+        tests: isize,
+        discards: isize,
+        shrinks: isize,
+        journal: Journal,
+    ) -> String {
+        let mut s = format!(
+            "*** Failed! Falsifiable (after {}{}{}):",
             render_tests(tests),
             render_and_shrinks(shrinks),
             render_discards(discards),
         );
-        journal::to_vec(journal).iter().for_each(|entry| s.push_str(entry));
+        journal::to_vec(journal)
+            .iter()
+            .for_each(|entry| s.push_str(entry));
         // discard extra newline?
-        s.truncate(s.len()-1);
+        s.truncate(s.len() - 1);
         s
     }
 }
@@ -206,12 +218,11 @@ pub mod report {
 
     pub fn render(report: Report) -> String {
         match report.status {
-            Status::Ok =>
-                pretty::render_ok(report.tests),
-            Status::GaveUp =>
-                pretty::render_gave_up(report.tests, report.discards),
-            Status::Failed((shrinks, journal)) =>
-                pretty::render_failed(report.tests, report.discards, shrinks, journal),
+            Status::Ok => pretty::render_ok(report.tests),
+            Status::GaveUp => pretty::render_gave_up(report.tests, report.discards),
+            Status::Failed((shrinks, journal)) => {
+                pretty::render_failed(report.tests, report.discards, shrinks, journal)
+            }
         }
     }
 
@@ -219,14 +230,14 @@ pub mod report {
     // then we could return them via Result.
     // Which would be a nice idiomatic rust pattern.
     //pub fn try_raise(report: Report) -> String {
-        //match report.status {
-            //Status::Ok =>
-                //pretty::render_ok(report.tests),
-            //Status::GaveUp =>
-                //pretty::render_gave_up(report.tests, report.discards),
-            //Status::Failed((shrinks, journal)) =>
-                //pretty::render_failed(report.tests, report.discards, shrinks, journal),
-        //}
+    //match report.status {
+    //Status::Ok =>
+    //pretty::render_ok(report.tests),
+    //Status::GaveUp =>
+    //pretty::render_gave_up(report.tests, report.discards),
+    //Status::Failed((shrinks, journal)) =>
+    //pretty::render_failed(report.tests, report.discards, shrinks, journal),
+    //}
     //}
 }
 
@@ -235,13 +246,15 @@ pub mod property {
     use crate::gen;
 
     pub fn from_gen<A>(x: Gen<(Journal, Result<A>)>) -> Property<A>
-        where A: Clone,
+    where
+        A: Clone,
     {
         Property(x)
     }
 
     pub fn to_gen<A>(Property(x): Property<A>) -> Gen<(Journal, Result<A>)>
-        where A: Clone,
+    where
+        A: Clone,
     {
         x
     }
@@ -251,8 +264,9 @@ pub mod property {
     // try_with
 
     pub fn delay<'a, F, A>(f: F) -> Property<'a, A>
-        where A: Clone + 'a,
-              F: Fn() -> Property<'a, A> + 'a,
+    where
+        A: Clone + 'a,
+        F: Fn() -> Property<'a, A> + 'a,
     {
         from_gen(gen::delay(Box::new(move || to_gen(f()))))
     }
@@ -261,25 +275,24 @@ pub mod property {
     // using
 
     pub fn filter<'a, F, A>(p: &'a F, m: Property<'a, A>) -> Property<'a, A>
-        where A: Clone + 'a,
-              F: Fn(&A) -> bool + 'a,
+    where
+        A: Clone + 'a,
+        F: Fn(&A) -> bool + 'a,
     {
         // TODO: Tuple mod.
-        from_gen(gen::map(Rc::new(move |x: (Journal, Result<A>)| {
-            tuple::second(|b| {
-                result::filter(p, b)
-            }, x.0, x.1)
-        }), to_gen(m)))
+        from_gen(gen::map(
+            Rc::new(move |x: (Journal, Result<A>)| {
+                tuple::second(|b| result::filter(p, b), x.0, x.1)
+            }),
+            to_gen(m),
+        ))
     }
 
     pub fn from_result<'a, A>(x: Result<A>) -> Property<'a, A>
-        where A: Clone + 'a,
+    where
+        A: Clone + 'a,
     {
-        from_gen(
-            gen::constant(
-                (journal::empty(), x)
-            )
-        )
+        from_gen(gen::constant((journal::empty(), x)))
     }
 
     pub fn failure<'a>() -> Property<'a, ()> {
@@ -291,7 +304,8 @@ pub mod property {
     }
 
     pub fn success<'a, A>(x: A) -> Property<'a, A>
-        where A: Clone + 'a,
+    where
+        A: Clone + 'a,
     {
         from_result(Result::Success(x))
     }
@@ -305,7 +319,8 @@ pub mod property {
     }
 
     pub fn counter_example<'a, F>(msg: &F) -> Property<'a, ()>
-        where F: Fn() -> String,
+    where
+        F: Fn() -> String,
     {
         // TODO: was delayed_singleton, now just singleton.
         let inner = (journal::singleton(msg()), Result::Success(()));
@@ -313,19 +328,19 @@ pub mod property {
     }
 
     fn map_gen<'a, A, B, F>(f: F, x: Property<'a, A>) -> Property<'a, B>
-        where
-            F: Fn(Gen<'a, (Journal, Result<A>)>) -> Gen<(Journal, Result<B>)>,
-            A: Clone,
-            B: Clone,
+    where
+        F: Fn(Gen<'a, (Journal, Result<A>)>) -> Gen<(Journal, Result<B>)>,
+        A: Clone,
+        B: Clone,
     {
         from_gen(f(to_gen(x)))
     }
 
     pub fn map<'a, F, A, B>(f: &'a F, x: Property<'a, A>) -> Property<'a, B>
-        where
-            F: Fn(A) -> B,
-            A: Clone + 'a,
-            B: Clone + 'a,
+    where
+        F: Fn(A) -> B,
+        A: Clone + 'a,
+        B: Clone + 'a,
     {
         map_gen(
             move |g1| {
@@ -333,87 +348,88 @@ pub mod property {
                     Rc::new(move |g2: (Journal, Result<A>)| {
                         tuple::second(|b| result::map(f, b), g2.0, g2.1)
                     }),
-                    g1
+                    g1,
                 )
             },
-            x
+            x,
         )
     }
 
-    fn bind_gen<'a, F, A, B>(m: Gen<'a, (Journal, Result<A>)>, k: F) -> Gen<'a, (Journal, Result<B>)>
-        where A: Clone + 'a,
-              B: Clone + 'a,
-              F: Fn(A) -> Gen<'a, (Journal, Result<B>)> + 'a,
+    fn bind_gen<'a, F, A, B>(
+        m: Gen<'a, (Journal, Result<A>)>,
+        k: F,
+    ) -> Gen<'a, (Journal, Result<B>)>
+    where
+        A: Clone + 'a,
+        B: Clone + 'a,
+        F: Fn(A) -> Gen<'a, (Journal, Result<B>)> + 'a,
     {
-        gen::bind(m, Rc::new(move |(journal, result): (Journal, Result<A>)| {
-            match result {
-                Result::Failure =>
-                    gen::constant((journal, Result::Failure)),
-                Result::Discard =>
-                    gen::constant((journal, Result::Discard)),
-                Result::Success(x) => {
-                    gen::map(Rc::new(
-                            move |(j, r)| {
-                                let journal = journal.clone();
-                                tuple::first(
-                                    move |j1| {
-                                        journal::append(journal.clone(), j1)
-                                    }, j, r)
-                            }), k(x))
+        gen::bind(
+            m,
+            Rc::new(
+                move |(journal, result): (Journal, Result<A>)| match result {
+                    Result::Failure => gen::constant((journal, Result::Failure)),
+                    Result::Discard => gen::constant((journal, Result::Discard)),
+                    Result::Success(x) => gen::map(
+                        Rc::new(move |(j, r)| {
+                            let journal = journal.clone();
+                            tuple::first(move |j1| journal::append(journal.clone(), j1), j, r)
+                        }),
+                        k(x),
+                    ),
                 },
-            }
-        }))
+            ),
+        )
     }
 
     pub fn bind<'a, F, A, B>(m: Property<'a, A>, k: F) -> Property<'a, B>
-        where
-            F: Fn(A) -> Property<'a, B> + 'a,
-            A: Clone + 'a,
-            B: Clone + 'a,
+    where
+        F: Fn(A) -> Property<'a, B> + 'a,
+        A: Clone + 'a,
+        B: Clone + 'a,
     {
         from_gen(bind_gen(to_gen(m), move |x| to_gen(k(x))))
     }
 
     pub fn for_all<'a, F, A, B>(gen: Gen<'a, A>, k: &'a F) -> Property<'a, B>
-        where
-            F: Fn(A) -> Property<'a, B> + 'a,
-            A: Clone + Display + 'a,
-            B: Clone + 'a,
+    where
+        F: Fn(A) -> Property<'a, B> + 'a,
+        A: Clone + Display + 'a,
+        B: Clone + 'a,
     {
         let prepend = Rc::new(move |x: A| {
             // pretend things don't panic.
-            to_gen(bind(counter_example(&|| format!("{}", x)), move |_| k(x.clone())))
+            to_gen(bind(counter_example(&|| format!("{}", x)), move |_| {
+                k(x.clone())
+            }))
         });
         from_gen(gen::bind(gen, prepend))
     }
 
     pub fn for_all_tick<'a, A>(gen: Gen<'a, A>) -> Property<'a, A>
-        where
-            A: Clone + Display + 'a,
+    where
+        A: Clone + Display + 'a,
     {
         for_all(gen, &|x: A| success(x))
     }
 
     // TODO: isize -> Shrinks
     fn take_smallest<A>(t: Tree<(Journal, Result<A>)>, nshrinks: isize) -> Status
-        where
-            A: Clone,
+    where
+        A: Clone,
     {
         let (journal, x) = t.value();
         let xs = t.children;
         match x {
-            Result::Failure =>
-                match xs.into_iter().find(|x| result::is_failure(tree::outcome(x).1)) {
-                    None =>
-                        Status::Failed((nshrinks, journal)),
-                    Some(tree) =>
-                        take_smallest(tree, nshrinks+1),
-                }
-                ,
-            Result::Discard =>
-                Status::GaveUp,
-            Result::Success(_) =>
-                Status::Ok,
+            Result::Failure => match xs
+                .into_iter()
+                .find(|x| result::is_failure(tree::outcome(x).1))
+            {
+                None => Status::Failed((nshrinks, journal)),
+                Some(tree) => take_smallest(tree, nshrinks + 1),
+            },
+            Result::Discard => Status::GaveUp,
+            Result::Success(_) => Status::Ok,
         }
     }
 
@@ -428,7 +444,6 @@ pub mod property {
             }
         };
 
-
         // TODO: isize -> tests, isize -> disacards
         pub fn loop0<'a, F>(
             seed: Seed,
@@ -437,10 +452,10 @@ pub mod property {
             discards: isize,
             n: isize,
             random: Random<'a, Tree<'a, (Journal, Result<()>)>>,
-            next_size: F
+            next_size: F,
         ) -> Report
-            where
-                F: Fn(Size) -> Size,
+        where
+            F: Fn(Size) -> Size,
         {
             if tests == n {
                 Report {
@@ -459,16 +474,29 @@ pub mod property {
                 let result = random::run(seed1, size, random.clone());
 
                 match tree::outcome(&result).1 {
-                    Result::Failure =>
-                        Report {
-                            tests: tests + 1,
-                            discards,
-                            status: take_smallest(result, 0),
-                        },
-                    Result::Success(()) =>
-                        loop0(seed2, next_size(size), tests + 1, discards, n, random, next_size),
-                    Result::Discard =>
-                        loop0(seed2, next_size(size), tests, discards + 1, n, random, next_size),
+                    Result::Failure => Report {
+                        tests: tests + 1,
+                        discards,
+                        status: take_smallest(result, 0),
+                    },
+                    Result::Success(()) => loop0(
+                        seed2,
+                        next_size(size),
+                        tests + 1,
+                        discards,
+                        n,
+                        random,
+                        next_size,
+                    ),
+                    Result::Discard => loop0(
+                        seed2,
+                        next_size(size),
+                        tests,
+                        discards + 1,
+                        n,
+                        random,
+                        next_size,
+                    ),
                 }
             }
         }

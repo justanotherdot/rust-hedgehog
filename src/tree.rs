@@ -1,8 +1,8 @@
 use lazy::Lazy;
 use std::borrow::Borrow;
-use std::rc::Rc;
 use std::fmt;
-use std::fmt::{Write, Display, Debug};
+use std::fmt::{Debug, Display, Write};
+use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub struct Tree<'a, A>
@@ -108,9 +108,7 @@ where
     F: Fn(A, X) -> B + 'static,
     G: Fn(Vec<B>) -> X + 'static,
 {
-    g(xs.into_iter()
-      .map(|x| fold(f, g, x))
-      .collect())
+    g(xs.into_iter().map(|x| fold(f, g, x)).collect())
 }
 
 impl<'a, A> PartialEq for Tree<'a, A>
@@ -228,10 +226,7 @@ fn shift(head: &str, other: &str, lines: Vec<String>) -> Vec<String> {
     out
 }
 
-fn render_forest_lines<'a, A>(
-    limit: i16,
-    forest: &[Tree<'a, A>],
-) -> Vec<String>
+fn render_forest_lines<'a, A>(limit: i16, forest: &[Tree<'a, A>]) -> Vec<String>
 where
     A: Debug + Clone,
 {
