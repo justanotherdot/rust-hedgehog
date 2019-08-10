@@ -1,6 +1,8 @@
 use lazy::Lazy;
 use std::borrow::Borrow;
 use std::rc::Rc;
+use std::fmt;
+use std::fmt::{Write, Display, Debug};
 
 #[derive(Clone, Debug)]
 pub struct Tree<'a, A>
@@ -209,6 +211,80 @@ where
     let x = f(t.value());
     let xs = t.children.into_iter().map(|c| map(f.clone(), c)).collect();
     Tree::new(x, xs)
+}
+
+// should be: shift hd other = zipWith (++) (hd : repeat other)
+fn shift(head: &str, other: &str, lines: Vec<String>) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut first = true;
+    for line in lines {
+        if first {
+            first = false;
+            out.push(format!("{}{}", head, line));
+        } else {
+            out.push(format!("{}{}", other, line));
+        }
+    }
+    out
+}
+
+fn render_forest_lines<'a, A>(
+    limit: i16,
+    forest: &[Tree<'a, A>],
+) -> Vec<String>
+where
+    A: Debug + Clone,
+{
+    if limit <= 0 {
+        return vec!["...".to_owned()];
+    }
+
+    match forest {
+        [] => vec![],
+        [x] => {
+            let s = render_tree_lines(limit - 1, x.as_ref());
+            shift(" └╼", "   ", s)
+        }
+        xs0 => {
+            let (x, xs) = xs0.split_at(1);
+            let s0 = render_tree_lines(limit - 1, x.first().unwrap().as_ref());
+            let ss = render_forest_lines(limit, xs);
+
+            let mut s = shift(" ├╼", " │ ", s0);
+
+            s.extend(ss.into_iter());
+            s
+        }
+    }
+}
+
+fn render_tree_lines<'a, A>(limit: i16, x: &Tree<'a, A>) -> Vec<String>
+where
+    A: Debug + Clone,
+{
+    let mut children: Vec<String> = render_forest_lines(limit, &x.children);
+    let node = format!(" {:?}", x.value());
+
+    children.insert(0, node);
+    children
+}
+
+impl<'a, A> Display for Tree<'a, A>
+where
+    A: Copy + Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error>
+    where
+        A: Debug,
+    {
+        for line in render_tree_lines(100, self) {
+            // surely a better way for direct Strings
+            f.write_str(&line)?;
+            f.write_char('\n')?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
