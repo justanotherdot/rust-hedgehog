@@ -669,6 +669,7 @@ mod test {
     fn print_sample_works() {
         print_sample(alpha());
         print_sample(i64(range::singleton(12)));
+        //print_sample(filter(Rc::new(|x| x == 12), i64(range::singleton(12))));
         //print_sample(vec(range::constant(1, 3))(u8(range::constant(3, 10))));
         //assert!(false);
     }

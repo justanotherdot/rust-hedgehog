@@ -104,28 +104,25 @@ where
     A: Clone + 'a,
 {
     Rc::new(move |seed0: Seed, size: Size| {
-        fn loop0<'b, B>(
-            r1: Random<'b, B>,
-            size1: Size,
-            seed: Seed,
-            k: usize,
-            mut acc: Vec<B>,
-        ) -> Vec<B>
-        where
-            B: Clone + 'b,
-        {
+        let mut k = times;
+        let mut acc = vec![];
+        let mut seed = seed0;
+
+        loop {
             if k <= 0 {
-                acc
+                break;
             } else {
                 let (seed1, seed2) = seed::split(seed);
-                let x = unsafe_run(seed1, size1, r1.clone());
-                // TODO: This insert is a bit funky.
-                // It is _probably_ faster to push and then reverse.
+                let x = unsafe_run(seed1, size, r.clone());
                 acc.insert(0, x);
-                loop0(r1, size1, seed2, k - 1, acc)
+
+                seed = seed2;
+                k = k-1;
+                continue;
             }
         }
-        loop0(r.clone(), size, seed0, times, vec![])
+
+        acc
     })
 }
 
