@@ -29,7 +29,8 @@ where
 
 // TODO: This function could just be a loop.
 fn unfold<A, B, F>(f: F, b0: B) -> Vec<A>
-where F: Fn(B) -> Option<(A, B)>,
+where
+    F: Fn(B) -> Option<(A, B)>,
 {
     match f(b0) {
         Some((a, b1)) => {
@@ -67,9 +68,9 @@ where
                     x.push(hd);
                     x
                 })
-            .collect();
-        inner.insert(0, tl);
-        inner
+                .collect();
+            inner.insert(0, tl);
+            inner
         }
     }
     let gen_len = FromPrimitive::from_usize(xs0.len()).unwrap();
@@ -93,14 +94,16 @@ where
                 let mut vs = vec![x1];
                 vs.append(&mut xs0.clone());
                 vs
-            }).collect();
+            })
+            .collect();
         let mut zs: Vec<_> = elems(shrink.clone(), xs0)
             .into_iter()
             .map(|xs1| {
                 let mut vs = vec![x0.clone()];
                 vs.append(&mut xs1.clone());
                 vs
-            }).collect();
+            })
+            .collect();
         ys.append(&mut zs);
         ys
     }
@@ -197,22 +200,26 @@ pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
-    sequence(Rc::new(move |xs: Vec<Tree<'a, A>>| {
-        let ys = xs.clone();
-        let mut shrinks = vec(xs);
-        let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
-        shrinks.append(&mut elems);
-        shrinks
-    }), xs0)
+    sequence(
+        Rc::new(move |xs: Vec<Tree<'a, A>>| {
+            let ys = xs.clone();
+            let mut shrinks = vec(xs);
+            let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
+            shrinks.append(&mut elems);
+            shrinks
+        }),
+        xs0,
+    )
 }
 
 pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
-    sequence(Rc::new(move |xs| {
-        elems(Rc::new(move |t| tree::shrinks(t)), xs)
-    }), xs0)
+    sequence(
+        Rc::new(move |xs| elems(Rc::new(move |t| tree::shrinks(t)), xs)),
+        xs0,
+    )
 }
 
 #[cfg(test)]
