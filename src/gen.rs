@@ -59,12 +59,14 @@ where
 }
 
 // TODO: This probably will need to become `apply!` for the primary purpose of doing
-pub fn apply<'a, A, B, F, C>(gf: Gen<'a, F, C>, gx: Gen<'a, A, C>) -> Gen<'a, B, C>
+pub fn apply<'a, A, B, F, C, D, E>(gf: Gen<'a, F, E>, gx: Gen<'a, A, C>) -> Gen<'a, B, D>
 where
     F: Fn(A) -> B + Clone + 'a,
     A: Clone + 'a,
     B: Clone + 'a,
     C: Iterator<Item = Tree<'a, A, C>>,
+    D: Iterator<Item = Tree<'a, B, D>>,
+    E: Iterator<Item = Tree<'a, F, E>>,
 {
     bind(
         gf,
