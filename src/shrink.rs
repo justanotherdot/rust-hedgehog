@@ -186,11 +186,11 @@ where
         .collect()
 }
 
-pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence<'a, A, F, C>(merge: Rc<F>, xs: Vec<Tree<'a, A, C>>) -> Tree<'a, Vec<A>, C>
 where
     A: Clone + 'a,
     // FIX: This is a bit silly because we don't have a LazyList type.
-    F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
+    F: Fn(Vec<Tree<'a, A, C>>) -> Vec<Vec<Tree<'a, A, C>>>,
 {
     let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
     let ys = merge(xs)
@@ -200,7 +200,7 @@ where
     Tree::new(y, ys)
 }
 
-pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_list<'a, A, C>(xs0: Vec<Tree<'a, A, C>>) -> Tree<'a, Vec<A>, C>
 where
     A: Clone + 'a,
 {
@@ -216,7 +216,7 @@ where
     )
 }
 
-pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_elems<'a, A, C>(xs0: Vec<Tree<'a, A, C>>) -> Tree<'a, Vec<A>, C>
 where
     A: Clone + 'a,
 {

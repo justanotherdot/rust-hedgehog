@@ -24,7 +24,7 @@ where
 }
 
 #[derive(Clone)]
-pub struct Property<'a, A>(Gen<'a, (Journal, Result<A>)>)
+pub struct Property<'a, A, C>(Gen<'a, (Journal, Result<A>), C>)
 where
     A: Clone;
 
@@ -245,14 +245,14 @@ pub mod property {
     use super::*;
     use crate::gen;
 
-    pub fn from_gen<A>(x: Gen<(Journal, Result<A>)>) -> Property<A>
+    pub fn from_gen<A, C>(x: Gen<(Journal, Result<A>), C>) -> Property<A, C>
     where
         A: Clone,
     {
         Property(x)
     }
 
-    pub fn to_gen<A>(Property(x): Property<A>) -> Gen<(Journal, Result<A>)>
+    pub fn to_gen<A, C>(Property(x): Property<A, C>) -> Gen<(Journal, Result<A>), C>
     where
         A: Clone,
     {
@@ -263,10 +263,10 @@ pub mod property {
     // try_finally
     // try_with
 
-    pub fn delay<'a, F, A>(f: F) -> Property<'a, A>
+    pub fn delay<'a, F, A, C>(f: F) -> Property<'a, A, C>
     where
         A: Clone + 'a,
-        F: Fn() -> Property<'a, A> + 'a,
+        F: Fn() -> Property<'a, A, C> + 'a,
     {
         from_gen(gen::delay(Box::new(move || to_gen(f()))))
     }
@@ -274,7 +274,7 @@ pub mod property {
     // TODO
     // using
 
-    pub fn filter<'a, F, A>(p: &'a F, m: Property<'a, A>) -> Property<'a, A>
+    pub fn filter<'a, F, A, C>(p: &'a F, m: Property<'a, A, C>) -> Property<'a, A, C>
     where
         A: Clone + 'a,
         F: Fn(&A) -> bool + 'a,
@@ -288,29 +288,29 @@ pub mod property {
         ))
     }
 
-    pub fn from_result<'a, A>(x: Result<A>) -> Property<'a, A>
+    pub fn from_result<'a, A, C>(x: Result<A>) -> Property<'a, A, C>
     where
         A: Clone + 'a,
     {
         from_gen(gen::constant((journal::empty(), x)))
     }
 
-    pub fn failure<'a>() -> Property<'a, ()> {
+    pub fn failure<'a, C>() -> Property<'a, (), C> {
         from_result(Result::Failure)
     }
 
-    pub fn discard<'a>() -> Property<'a, ()> {
+    pub fn discard<'a, C>() -> Property<'a, (), C> {
         from_result(Result::Discard)
     }
 
-    pub fn success<'a, A>(x: A) -> Property<'a, A>
+    pub fn success<'a, A, C>(x: A) -> Property<'a, A, C>
     where
         A: Clone + 'a,
     {
         from_result(Result::Success(x))
     }
 
-    pub fn from_bool<'a>(x: bool) -> Property<'a, ()> {
+    pub fn from_bool<'a, C>(x: bool) -> Property<'a, (), C> {
         if x {
             success(())
         } else {
@@ -318,7 +318,7 @@ pub mod property {
         }
     }
 
-    pub fn counter_example<'a, F>(msg: &F) -> Property<'a, ()>
+    pub fn counter_example<'a, F, C>(msg: &F) -> Property<'a, (), C>
     where
         F: Fn() -> String,
     {
@@ -327,16 +327,16 @@ pub mod property {
         from_gen(gen::constant(inner))
     }
 
-    fn map_gen<'a, A, B, F>(f: F, x: Property<'a, A>) -> Property<'a, B>
+    fn map_gen<'a, A, B, F, C>(f: F, x: Property<'a, A, C>) -> Property<'a, B, C>
     where
-        F: Fn(Gen<'a, (Journal, Result<A>)>) -> Gen<(Journal, Result<B>)>,
+        F: Fn(Gen<'a, (Journal, Result<A>), C>) -> Gen<(Journal, Result<B>), C>,
         A: Clone,
         B: Clone,
     {
         from_gen(f(to_gen(x)))
     }
 
-    pub fn map<'a, F, A, B>(f: &'a F, x: Property<'a, A>) -> Property<'a, B>
+    pub fn map<'a, F, A, B, C>(f: &'a F, x: Property<'a, A, C>) -> Property<'a, B, C>
     where
         F: Fn(A) -> B,
         A: Clone + 'a,
@@ -355,14 +355,14 @@ pub mod property {
         )
     }
 
-    fn bind_gen<'a, F, A, B>(
-        m: Gen<'a, (Journal, Result<A>)>,
+    fn bind_gen<'a, F, A, B, C>(
+        m: Gen<'a, (Journal, Result<A>), C>,
         k: F,
-    ) -> Gen<'a, (Journal, Result<B>)>
+    ) -> Gen<'a, (Journal, Result<B>), C>
     where
         A: Clone + 'a,
         B: Clone + 'a,
-        F: Fn(A) -> Gen<'a, (Journal, Result<B>)> + 'a,
+        F: Fn(A) -> Gen<'a, (Journal, Result<B>), C> + 'a,
     {
         gen::bind(
             m,
@@ -382,18 +382,18 @@ pub mod property {
         )
     }
 
-    pub fn bind<'a, F, A, B>(m: Property<'a, A>, k: F) -> Property<'a, B>
+    pub fn bind<'a, F, A, B, C>(m: Property<'a, A, C>, k: F) -> Property<'a, B, C>
     where
-        F: Fn(A) -> Property<'a, B> + 'a,
+        F: Fn(A) -> Property<'a, B, C> + 'a,
         A: Clone + 'a,
         B: Clone + 'a,
     {
         from_gen(bind_gen(to_gen(m), move |x| to_gen(k(x))))
     }
 
-    pub fn for_all<'a, F, A, B>(gen: Gen<'a, A>, k: &'a F) -> Property<'a, B>
+    pub fn for_all<'a, F, A, B, C>(gen: Gen<'a, A, C>, k: &'a F) -> Property<'a, B, C>
     where
-        F: Fn(A) -> Property<'a, B> + 'a,
+        F: Fn(A) -> Property<'a, B, C> + 'a,
         A: Clone + Display + 'a,
         B: Clone + 'a,
     {
@@ -406,7 +406,7 @@ pub mod property {
         from_gen(gen::bind(gen, prepend))
     }
 
-    pub fn for_all_tick<'a, A>(gen: Gen<'a, A>) -> Property<'a, A>
+    pub fn for_all_tick<'a, A, C>(gen: Gen<'a, A, C>) -> Property<'a, A, C>
     where
         A: Clone + Display + 'a,
     {
@@ -414,7 +414,7 @@ pub mod property {
     }
 
     // TODO: isize -> Shrinks
-    fn take_smallest<A>(t: Tree<(Journal, Result<A>)>, nshrinks: isize) -> Status
+    fn take_smallest<A, C>(t: Tree<(Journal, Result<A>), C>, nshrinks: isize) -> Status
     where
         A: Clone,
     {
@@ -434,7 +434,7 @@ pub mod property {
     }
 
     // TODO: isize
-    pub fn report_tick(n: isize, p: Property<()>) -> Report {
+    pub fn report_tick<C>(n: isize, p: Property<(), C>) -> Report {
         let random = gen::to_random(to_gen(p));
         let next_size = |size: Size| {
             if size.0 >= 100 {
@@ -445,13 +445,13 @@ pub mod property {
         };
 
         // TODO: isize -> tests, isize -> disacards
-        pub fn loop0<'a, F>(
+        pub fn loop0<'a, F, C>(
             seed: Seed,
             size: Size,
             tests: isize,
             discards: isize,
             n: isize,
-            random: Random<'a, Tree<'a, (Journal, Result<()>)>>,
+            random: Random<'a, Tree<'a, (Journal, Result<()>), C>>,
             next_size: F,
         ) -> Report
         where
@@ -505,34 +505,34 @@ pub mod property {
         loop0(seed, Size(1), 0, 0, n, random, next_size)
     }
 
-    pub fn report(p: Property<()>) -> Report {
+    pub fn report<C>(p: Property<(), C>) -> Report {
         report_tick(100, p)
     }
 
     // TODO: isize -> tests
-    pub fn check_tick(n: isize, p: Property<()>) {
+    pub fn check_tick<C>(n: isize, p: Property<(), C>) {
         report_tick(n, p);
     }
 
-    pub fn check(p: Property<()>) {
+    pub fn check<C>(p: Property<(), C>) {
         report(p);
     }
 
-    pub fn check_bool(g: Property<bool>) {
+    pub fn check_bool<C>(g: Property<bool, C>) {
         check(bind(g, from_bool))
     }
 
     // TODO: isize -> tests
-    pub fn check_bool_tick(n: isize, g: Property<bool>) {
+    pub fn check_bool_tick<C>(n: isize, g: Property<bool, C>) {
         check_tick(n, bind(g, from_bool))
     }
 
     // TODO: isize -> tests
-    pub fn print_tick(n: isize, p: Property<()>) {
+    pub fn print_tick<C>(n: isize, p: Property<(), C>) {
         println!("{}", report::render(report_tick(n, p)))
     }
 
-    pub fn print(p: Property<()>) {
+    pub fn print<C>(p: Property<(), C>) {
         print!("{}", report::render(report(p)))
     }
 }
