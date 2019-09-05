@@ -5,19 +5,47 @@ use std::fmt::{Debug, Display, Write};
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
+pub struct LazyList<'a, A>
+where
+    A: Clone,
+{
+    head: Option<A>,
+    tail: Rc<Option<Lazy<'a, LazyList<'a, A>>>>,
+}
+
+impl<'a, A> LazyList<'a, A>
+where
+    A: Clone,
+{
+    pub fn empty() -> Self {
+        Self {
+            head: None,
+            tail: Rc::new(None),
+        }
+    }
+
+    pub fn new(head: A) -> Self {
+        Self {
+            head: Some(head),
+            tail: Rc::new(None),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Tree<'a, A>
 where
     A: Clone,
 {
     thunk: Lazy<'a, A>,
-    pub children: Vec<Tree<'a, A>>,
+    pub children: Rc<LazyList<'a, Tree<'a, A>>>,
 }
 
 impl<'a, A> Tree<'a, A>
 where
     A: 'a + Clone,
 {
-    pub fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
+    pub fn new(value: A, children: Rc<LazyList<'a, Tree<'a, A>>>) -> Self {
         let thunk = Lazy::new(value);
         Tree { thunk, children }
     }
