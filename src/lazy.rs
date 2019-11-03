@@ -2,6 +2,13 @@ use std::cell::RefCell;
 use std::fmt::{Debug, Error, Formatter};
 use std::rc::Rc;
 
+#[macro_export]
+macro_rules! lazy(
+    ( $v:expr ) => {
+        Lazy::from_closure(move || { $v })
+    }
+);
+
 // TODO: For the moment we use RefCell but if someone tries to force a value on the same node at
 // the same time e.g. in parallel, this might cause a panic. This may not actually be a concern.
 #[derive(Clone)]
@@ -29,6 +36,14 @@ where
             closure: Rc::new(closure),
             value: RefCell::new(None),
         }
+    }
+
+    pub fn map<F, B>(&self, f: F) -> Lazy<B>
+    where
+        F: Fn(A) -> B + 'a,
+        B: Clone + 'a,
+    {
+        Lazy::from_closure(move || f(self.value()))
     }
 
     fn force(&self) {
