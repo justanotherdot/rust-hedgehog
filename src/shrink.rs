@@ -1,79 +1,71 @@
 extern crate num;
 
 use self::num::{Float, FromPrimitive, Integer};
+use crate::lazy::{Lazy, LazyVec};
 use crate::tree;
 use crate::tree::Tree;
 use std::rc::Rc;
 
-// TODO: missing:
-//   * sequenceElems
-
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
 // pipeline a la the F# port.
-fn cons_nub<'a, A: 'a>(x: A) -> Box<dyn Fn(Vec<A>) -> Vec<A> + 'a>
+fn cons_nub<'a, A: 'a>(x: A) -> Box<dyn Fn(LazyVec<'a, A>) -> LazyVec<'a, A> + 'a>
 where
     A: Integer + FromPrimitive + Copy,
 {
-    let cons_nub_do = move |ys0: Vec<A>| match ys0.first() {
-        None => vec![],
-        Some(&y) if x == y => ys0,
-        Some(_) => {
-            let mut ys1 = ys0.clone();
-            ys1.insert(0, x);
-            ys1
-        }
+    let cons_nub_do = move |ys0: LazyVec<'a, A>| match ys0.first() {
+        None => LazyVec::empty(),
+        Some(y) if x == y => ys0,
+        Some(_) => ys0.map(|ys2| {
+            ys2.insert(0, x);
+            ys2
+        }),
     };
     Box::new(cons_nub_do)
 }
 
-// TODO: This function could just be a loop.
-fn unfold<A, B, F>(f: F, b0: B) -> Vec<A>
+fn unfold<'a, A, B, F>(f: F, b0: B) -> LazyVec<'a, A>
 where
+    A: Clone + 'a,
     F: Fn(B) -> Option<(A, B)>,
 {
     let mut acc = vec![];
     let mut b = b0;
     loop {
         if let Some((a, b1)) = f(b) {
-            acc.push(a);
+            acc.push(Lazy::new(a));
             b = b1;
             continue;
         } else {
             break;
         }
     }
-    acc
+    LazyVec::from_vec(acc)
 }
 
-// We don't discriminate between LazyList and List
-// and we treat LazyList as Vec.
-pub fn removes<A, B>(k0: B, xs0: Vec<A>) -> Vec<Vec<A>>
+pub fn removes<'a, A, B>(k0: B, xs0: LazyVec<'a, A>) -> LazyVec<'a, LazyVec<'a, A>>
 where
-    A: Clone,
-    B: Integer + FromPrimitive + Copy,
+    A: Clone + 'a,
+    B: Integer + FromPrimitive + Copy + 'a,
 {
-    fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
+    fn loop0<'b, C, D>(k: C, n: C, xs: LazyVec<'b, D>) -> LazyVec<'b, LazyVec<'b, D>>
     where
         C: Integer + FromPrimitive + Copy,
         D: Clone,
     {
-        let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
-        let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
+        let hd = &xs.clone().take(1).get(0).unwrap();
+        let tl: LazyVec<_> = xs.clone().skip(1);
         if k > n {
-            vec![]
+            LazyVec::empty()
         } else if tl.is_empty() {
-            vec![vec![]]
+            LazyVec::singleton(LazyVec::empty())
         } else {
-            let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
-                .into_iter()
-                .map(move |mut x| {
-                    let hd = hd.clone();
-                    x.push(hd);
-                    x
-                })
-                .collect();
-            inner.insert(0, tl);
+            let inner: LazyVec<_> = loop0(k, n - k, tl.clone()).map(move |mut x| {
+                let hd = hd.clone();
+                x.push(hd);
+                x
+            });
+            let inner = inner.insert(0, tl);
             inner
         }
     }
@@ -81,41 +73,35 @@ where
     loop0(k0, gen_len, xs0)
 }
 
-pub fn elems<A, F>(shrink: Rc<F>, xs00: Vec<A>) -> Vec<Vec<A>>
+pub fn elems<'a, A, F>(shrink: Rc<F>, xs00: LazyVec<'a, A>) -> LazyVec<'a, LazyVec<'a, A>>
 where
-    A: Clone,
-    F: Fn(A) -> Vec<A>,
+    A: Clone + 'a,
+    F: Fn(A) -> LazyVec<'a, A> + 'a,
 {
     if xs00.is_empty() {
-        vec![]
+        LazyVec::empty()
     } else {
-        let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
+        let xs01 = xs00.clone().take(1);
         let x0 = xs01.get(0).unwrap();
-        let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
-        let mut ys: Vec<_> = shrink(x0.clone())
-            .into_iter()
-            .map(|x1| {
-                let mut vs = vec![x1];
-                vs.append(&mut xs0.clone());
-                vs
-            })
-            .collect();
-        let mut zs: Vec<_> = elems(shrink.clone(), xs0)
-            .into_iter()
-            .map(|xs1| {
-                let mut vs = vec![x0.clone()];
-                vs.append(&mut xs1.clone());
-                vs
-            })
-            .collect();
-        ys.append(&mut zs);
+        let xs0: LazyVec<_> = xs00.skip(1);
+        let ys: LazyVec<_> = shrink(x0.clone()).map(&|x1| {
+            let vs = LazyVec::singleton(x1);
+            vs.append(xs0);
+            vs
+        });
+        let zs: LazyVec<_> = elems(shrink.clone(), xs0).map(&|xs1: LazyVec<'a, A>| {
+            let vs = LazyVec::singleton(x0.clone());
+            let vs = vs.append(xs1.clone());
+            vs
+        });
+        let ys = ys.append(zs);
         ys
     }
 }
 
-pub fn halves<A>(n: A) -> Vec<A>
+pub fn halves<'a, A>(n: A) -> LazyVec<'a, A>
 where
-    A: Integer + FromPrimitive + Copy,
+    A: Integer + FromPrimitive + Copy + 'a,
 {
     let go = |x0| {
         let zero = num::zero();
@@ -131,32 +117,32 @@ where
 }
 
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, A>(destination: A, x: A) -> Vec<A>
+pub fn towards<'a, A>(destination: A, x: A) -> LazyVec<'a, A>
 where
     A: 'a,
     A: Integer + FromPrimitive + Copy,
 {
     if destination == x {
-        vec![]
+        LazyVec::empty()
     } else {
         // We need to halve our operands before subtracting them as they may be using
         // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
         let two = FromPrimitive::from_isize(2).unwrap();
         let diff = (x / two) - (destination / two);
 
-        cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
+        cons_nub(destination)(halves(diff).map(&|y| x - y))
     }
 }
 
 // TODO: rename to monomorphic variant.
 /// Shrink a floating-point number by edging towards a destination.
 /// Note we always try the destination first, as that is the optimal shrink.
-pub fn towards_float<'a, A: 'a>(destination: A, x: A) -> Vec<A>
+pub fn towards_float<'a, A: 'a>(destination: A, x: A) -> LazyVec<'a, A>
 where
-    A: Float + FromPrimitive + Copy,
+    A: Float + FromPrimitive + Copy + 'a,
 {
     if destination == x {
-        Vec::new()
+        LazyVec::empty()
     } else {
         let diff = x - destination;
         let go = |n| {
@@ -172,51 +158,44 @@ where
     }
 }
 
-// n.b. previously `list'
-pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>>
+pub fn lazy_vec<'a, A>(xs: LazyVec<'a, A>) -> LazyVec<'a, LazyVec<'a, A>>
 where
-    A: Clone,
+    A: Clone + 'a,
 {
-    halves(xs.len())
-        .into_iter()
-        .flat_map(move |k| {
-            let xs = xs.clone();
-            removes(k, xs)
-        })
-        .collect()
+    halves(xs.len()).flat_map(&|k| {
+        let xs = xs.clone();
+        removes(k, xs)
+    })
 }
 
-pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence<'a, A, F>(merge: Rc<F>, xs: LazyVec<'a, Tree<'a, A>>) -> Tree<'a, LazyVec<'a, A>>
 where
     A: Clone + 'a,
     // FIX: This is a bit silly because we don't have a LazyList type.
-    F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
+    F: Fn(LazyVec<'a, Tree<'a, A>>) -> LazyVec<'a, LazyVec<'a, Tree<'a, A>>> + 'a,
 {
-    let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
-    let ys = merge(xs)
-        .into_iter()
-        .map(|v| sequence(merge.clone(), v))
-        .collect();
+    let y = xs.clone().map(&|t| tree::outcome(t));
+    let ys = merge(xs).map(&|v| sequence(merge.clone(), v));
     Tree::new(y, ys)
 }
 
-pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_list<'a, A>(xs0: LazyVec<'a, Tree<'a, A>>) -> Tree<'a, LazyVec<'a, A>>
 where
     A: Clone + 'a,
 {
     sequence(
-        Rc::new(move |xs: Vec<Tree<'a, A>>| {
+        Rc::new(move |xs: LazyVec<'a, Tree<'a, A>>| {
             let ys = xs.clone();
-            let mut shrinks = vec(xs);
-            let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
-            shrinks.append(&mut elems);
+            let shrinks = lazy_vec(xs);
+            let elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
+            let shrinks = shrinks.append(elems);
             shrinks
         }),
         xs0,
     )
 }
 
-pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_elems<'a, A>(xs0: LazyVec<'a, Tree<'a, A>>) -> Tree<'a, LazyVec<'a, A>>
 where
     A: Clone + 'a,
 {
@@ -233,14 +212,14 @@ mod test {
     #[test]
     fn towards_works() {
         let f = |x| towards(3, x);
-        assert_eq!(f(100), vec![3, 51, 76, 88, 94, 97, 99]);
+        assert_eq!(f(100), lazy_vec![3, 51, 76, 88, 94, 97, 99]);
     }
 
     #[test]
     fn towards_float_works() {
         let f = |x| towards_float(100.0, x);
 
-        let expected = vec![
+        let expected = lazy_vec![
             100.0,
             300.0,
             400.0,

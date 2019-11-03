@@ -1,4 +1,4 @@
-use lazy::Lazy;
+use lazy::{Lazy, LazyVec};
 use std::borrow::Borrow;
 use std::fmt;
 use std::fmt::{Debug, Display, Write};
@@ -10,14 +10,15 @@ where
     A: Clone,
 {
     thunk: Lazy<'a, A>,
-    pub children: Vec<Tree<'a, A>>,
+    //pub children: Vec<Tree<'a, A>>,
+    pub children: LazyVec<'a, Tree<'a, A>>,
 }
 
 impl<'a, A> Tree<'a, A>
 where
     A: 'a + Clone,
 {
-    pub fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
+    pub fn new(value: A, children: LazyVec<'a, Tree<'a, A>>) -> Self {
         let thunk = Lazy::new(value);
         Tree { thunk, children }
     }
@@ -25,7 +26,7 @@ where
     pub fn singleton(value: A) -> Tree<'a, A> {
         Tree {
             thunk: Lazy::new(value),
-            children: vec![],
+            children: LazyVec::empty(),
         }
     }
 
@@ -35,15 +36,13 @@ where
 
     pub fn expand<F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, A>
     where
-        F: Fn(A) -> Vec<A>,
+        F: Fn(A) -> LazyVec<'a, A> + 'a,
     {
-        let mut children: Vec<Tree<'a, A>> = t
+        let mut children: LazyVec<Tree<'a, A>> = t
             .children
-            .iter()
-            .map(|t| Self::expand(f.clone(), t.clone()))
-            .collect();
-        let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
-        children.append(&mut zs);
+            .map(&|t: Tree<'a, A>| Self::expand(f.clone(), t.clone()));
+        let zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
+        let children = children.append(zs);
         Tree::new(t.value(), children)
     }
 }
@@ -56,9 +55,9 @@ where
 {
     let x = t.value();
     let xs0 = t.children;
-    let mut t1 = k(x.clone());
-    let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone(), k.clone())).collect();
-    xs.append(&mut t1.children);
+    let t1 = k(x.clone());
+    let xs: LazyVec<Tree<'a, B>> = xs0.map(&|m: Tree<'a, A>| bind(m.clone(), k.clone()));
+    let xs = xs.append(t1.children);
     Tree {
         thunk: t1.thunk,
         children: xs,
@@ -76,39 +75,32 @@ pub fn duplicate<'a, A>(t: Tree<'a, A>) -> Tree<'a, Tree<'a, A>>
 where
     A: Clone + 'a,
 {
-    let xs = t
-        .clone()
-        .children
-        .into_iter()
-        .map(|x| duplicate(x))
-        .collect();
+    let xs = t.clone().children.map(&|x| duplicate(x));
     Tree::new(t, xs)
 }
 
-pub fn fold<A, X, B, F, G>(f: &F, g: &G, t: Tree<A>) -> B
+pub fn fold<'a, A, X, B, F, G>(f: &'a F, g: &'a G, t: Tree<'a, A>) -> B
 where
-    A: Clone,
-    B: Clone,
-    X: Clone,
-    // TODO get rid of these static lifetimes
-    F: Fn(A, X) -> B + 'static,
-    G: Fn(Vec<B>) -> X + 'static,
+    A: Clone + 'a,
+    B: Clone + 'a,
+    X: Clone + 'a,
+    F: Fn(A, X) -> B + 'a,
+    G: Fn(LazyVec<'a, B>) -> X + 'a,
 {
     let x = t.value();
     let xs = t.children;
     f(x, fold_forest(f, g, xs))
 }
 
-pub fn fold_forest<'a, A, X, B, F, G>(f: &F, g: &G, xs: Vec<Tree<A>>) -> X
+pub fn fold_forest<'a, A, X, B, F, G>(f: &'a F, g: &'a G, xs: LazyVec<'a, Tree<'a, A>>) -> X
 where
-    A: Clone,
-    B: Clone,
-    X: Clone,
-    // TODO get rid of these static lifetimes
-    F: Fn(A, X) -> B + 'static,
-    G: Fn(Vec<B>) -> X + 'static,
+    A: Clone + 'a,
+    B: Clone + 'a,
+    X: Clone + 'a,
+    F: Fn(A, X) -> B + 'a,
+    G: Fn(LazyVec<'a, B>) -> X + 'a,
 {
-    g(xs.into_iter().map(|x| fold(f, g, x)).collect())
+    g(xs.map(&|x| fold(f, g, x)))
 }
 
 impl<'a, A> PartialEq for Tree<'a, A>
@@ -119,9 +111,8 @@ where
         self.value() == other.value()
             && self
                 .children
-                .iter()
-                .zip(&other.children)
-                .all(|(x, y)| x.value() == y.value())
+                .zip(other.children)
+                .all(&|(x, y): (Tree<'a, A>, Tree<'a, A>)| x.value() == y.value())
     }
 }
 
@@ -130,8 +121,8 @@ pub fn unfold<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Tree<'a, A>
 where
     A: Clone + 'a,
     B: Clone + 'a,
-    F: Fn(B) -> A,
-    G: Fn(B) -> Vec<B>,
+    F: Fn(B) -> A + 'a,
+    G: Fn(B) -> LazyVec<'a, B> + 'a,
 {
     let y = f(x.clone());
     Tree {
@@ -141,16 +132,14 @@ where
 }
 
 /// Build a list of trees from an unfolding function and a seed value.
-pub fn unfold_forest<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Vec<Tree<'a, A>>
+pub fn unfold_forest<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> LazyVec<'a, Tree<'a, A>>
 where
     A: Clone + 'a,
     B: Clone + 'a,
-    F: Fn(B) -> A,
-    G: Fn(B) -> Vec<B>,
+    F: Fn(B) -> A + 'a,
+    G: Fn(B) -> LazyVec<'a, B> + 'a,
 {
-    g(x).iter()
-        .map(move |v| unfold(f.clone(), g.clone(), v.clone()))
-        .collect()
+    g(x).map(&|v: B| unfold(f.clone(), g.clone(), v.clone()))
 }
 
 // TODO: Not sure if this a poor pattern.
@@ -173,7 +162,7 @@ where
     t.as_ref().value()
 }
 
-pub fn shrinks<A>(t: Tree<A>) -> Vec<Tree<A>>
+pub fn shrinks<A>(t: Tree<A>) -> LazyVec<Tree<A>>
 where
     A: Clone,
 {
@@ -189,25 +178,23 @@ where
     Tree::new(t.value(), filter_forest(f.clone(), t.children))
 }
 
-pub fn filter_forest<'a, A, F>(f: Rc<F>, xs: Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
+pub fn filter_forest<'a, A, F>(f: Rc<F>, xs: LazyVec<'a, Tree<'a, A>>) -> LazyVec<'a, Tree<'a, A>>
 where
     A: Clone + 'a,
     F: Fn(A) -> bool + 'a,
 {
-    xs.into_iter()
-        .filter(|x| f(outcome(x.clone())))
-        .map(|x| filter(f.clone(), x))
-        .collect()
+    xs.filter(&|x| f(outcome(x.clone())))
+        .map(&|x| filter(f.clone(), x))
 }
 
 pub fn map<'a, A, B, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, B>
 where
     A: Clone + 'a,
     B: Clone + 'a,
-    F: Fn(A) -> B,
+    F: Fn(A) -> B + 'a,
 {
     let x = f(t.value());
-    let xs = t.children.into_iter().map(|c| map(f.clone(), c)).collect();
+    let xs = t.children.map(&|c| map(f.clone(), c));
     Tree::new(x, xs)
 }
 
@@ -226,9 +213,9 @@ fn shift(head: &str, other: &str, lines: Vec<String>) -> Vec<String> {
     out
 }
 
-fn render_forest_lines<'a, A>(limit: i16, forest: &[Tree<'a, A>]) -> Vec<String>
+fn render_forest_lines<'a, A>(limit: i16, forest: &[Lazy<'a, Tree<'a, A>>]) -> Vec<String>
 where
-    A: Debug + Clone,
+    A: Debug + Clone + 'a,
 {
     if limit <= 0 {
         return vec!["...".to_owned()];
@@ -237,12 +224,12 @@ where
     match forest {
         [] => vec![],
         [x] => {
-            let s = render_tree_lines(limit - 1, x.as_ref());
+            let s = render_tree_lines(limit - 1, x.value().as_ref());
             shift(" └╼", "   ", s)
         }
         xs0 => {
             let (x, xs) = xs0.split_at(1);
-            let s0 = render_tree_lines(limit - 1, x.first().unwrap().as_ref());
+            let s0 = render_tree_lines(limit - 1, x.first().unwrap().value().as_ref());
             let ss = render_forest_lines(limit, xs);
 
             let mut s = shift(" ├╼", " │ ", s0);
@@ -255,9 +242,9 @@ where
 
 fn render_tree_lines<'a, A>(limit: i16, x: &Tree<'a, A>) -> Vec<String>
 where
-    A: Debug + Clone,
+    A: Debug + Clone + 'a,
 {
-    let mut children: Vec<String> = render_forest_lines(limit, &x.children);
+    let mut children: Vec<String> = render_forest_lines(limit, x.children.to_vec().as_slice());
     let node = format!(" {:?}", x.value());
 
     children.insert(0, node);
@@ -266,12 +253,9 @@ where
 
 impl<'a, A> Display for Tree<'a, A>
 where
-    A: Copy + Debug,
+    A: Copy + Debug + 'a,
 {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error>
-    where
-        A: Debug,
-    {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for line in render_tree_lines(100, self) {
             // surely a better way for direct Strings
             f.write_str(&line)?;

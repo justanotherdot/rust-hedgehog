@@ -1,3 +1,4 @@
+use crate::lazy::LazyVec;
 use crate::random;
 use crate::random::Random;
 use crate::range;
@@ -161,7 +162,7 @@ pub fn no_shrink<'a, A>(g: Gen<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
 {
-    let drop = |t: Tree<'a, A>| Tree::new(tree::outcome(t), vec![]);
+    let drop = |t: Tree<'a, A>| Tree::new(tree::outcome(t), LazyVec::empty());
     map_tree(Rc::new(drop), g)
 }
 

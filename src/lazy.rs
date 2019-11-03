@@ -31,6 +31,15 @@ where
         }
     }
 
+    pub fn map<B, F>(self, f: &'a F) -> Lazy<'a, B>
+    where
+        F: Fn(A) -> B + 'a,
+        A: Clone + 'a,
+        B: Clone + 'a,
+    {
+        Lazy::from_closure(|| f(self.value()))
+    }
+
     fn force(&self) {
         let mut val = self.value.borrow_mut();
         if val.is_none() {
@@ -54,6 +63,171 @@ where
         f.write_str(&format!("{:#?}", val))
     }
 }
+
+impl<'a, A: Clone> PartialEq for Lazy<'a, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.value() == other.value()
+    }
+}
+
+impl<'a, A: Clone> Eq for Lazy<'a, A> {}
+
+#[derive(Clone, Debug)]
+pub struct LazyVec<'a, A: Clone>(Lazy<'a, Vec<Lazy<'a, A>>>);
+
+impl<'a, A: Clone + 'a> LazyVec<'a, A> {
+    pub fn empty() -> LazyVec<'a, A> {
+        LazyVec(Lazy::new(vec![]))
+    }
+
+    pub fn singleton(x: A) -> LazyVec<'a, A> {
+        LazyVec(Lazy::new(vec![Lazy::new(x)]))
+    }
+
+    pub fn from_vec(xs: Vec<Lazy<'a, A>>) -> LazyVec<'a, A> {
+        LazyVec(Lazy::new(xs))
+    }
+
+    pub fn len(&self) -> usize {
+        // TODO: This probably ought not to force the value.
+        // Perhaps we can clone self and only force the spine by looking at the cloned values len
+        // field?
+        self.0.value().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn append(self, other: LazyVec<'a, A>) -> LazyVec<'a, A> {
+        unimplemented!()
+        //self.map(&|xs: Vec<Lazy<'a, A>>| {
+        //other.map(&|ys: Vec<Lazy<'a, A>>| -> Vec<Lazy<'a, A>> {
+        //xs.into_iter().chain(ys).collect()
+        //})
+        //})
+    }
+
+    pub fn insert(self, pos: usize, elem: A) -> LazyVec<'a, A> {
+        LazyVec(self.0.map(&|xs| {
+            let mut xs0 = xs.clone();
+            xs0.insert(pos, Lazy::new(elem));
+            xs0
+        }))
+    }
+
+    pub fn push(self, elem: A) -> LazyVec<'a, A> {
+        LazyVec(self.0.map(&|xs| {
+            let mut xs0 = xs.clone();
+            xs0.push(Lazy::new(elem));
+            xs0
+        }))
+    }
+
+    pub fn map<B, F>(self, f: &'a F) -> LazyVec<'a, B>
+    where
+        F: Fn(A) -> B + 'a,
+        A: Clone + 'a,
+        B: Clone + 'a,
+    {
+        LazyVec(
+            self.0
+                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().map(|x| x.map(f)).collect()),
+        )
+    }
+
+    pub fn first(&self) -> Option<A> {
+        self.get(0)
+    }
+
+    pub fn take(self, n: usize) -> LazyVec<'a, A> {
+        LazyVec(
+            self.0
+                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().take(1).collect()),
+        )
+    }
+
+    pub fn skip(self, n: usize) -> LazyVec<'a, A> {
+        LazyVec(
+            self.0
+                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().skip(1).collect()),
+        )
+    }
+
+    pub fn get(self, n: usize) -> Option<A> {
+        self.0.value().get(n).map(|x| x.value())
+    }
+
+    pub fn flat_map<B, F>(self, f: &'a F) -> LazyVec<'a, B>
+    where
+        F: Fn(A) -> LazyVec<'a, B> + 'a,
+        A: Clone + 'a,
+        B: Clone + 'a,
+    {
+        unimplemented!()
+        //LazyVec(
+        //self.0
+        //.map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().map(|x| x.map(f)).collect()),
+        //)
+    }
+
+    pub fn filter<F>(self, f: &'a F) -> LazyVec<'a, A>
+    where
+        F: Fn(A) -> bool + 'a,
+        A: Clone + 'a,
+    {
+        LazyVec(
+            self.0
+                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().filter(|x| f(x.value())).collect()),
+        )
+    }
+
+    pub fn to_vec(&self) -> Vec<Lazy<'a, A>> {
+        self.0.value()
+    }
+
+    pub fn zip<B>(self, other: LazyVec<'a, B>) -> LazyVec<'a, (A, B)>
+    where
+        B: Clone + 'a,
+    {
+        unimplemented!()
+        //self.map(&|xs: Vec<Lazy<'a, A>>| {
+        //other.map(&|ys: Vec<Lazy<'a, A>>| -> Vec<Lazy<'a, A>> {
+        //xs.into_iter().chain(ys).collect()
+        //})
+        //})
+    }
+
+    pub fn all<F>(self, f: &'a F) -> bool
+    where
+        F: Fn(A) -> bool + 'a,
+        A: Clone + 'a,
+    {
+        self.0
+            .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().all(|x| f(x.value())))
+            .value()
+    }
+}
+
+macro_rules! lazy_vec(
+    [ $( $value:expr ),* ] => {
+    {
+        let lv = LazyVec::empty();
+        $(
+            lv.push($value);
+        )+
+        lv
+    }
+    }
+);
+
+impl<'a, A: Clone> PartialEq for LazyVec<'a, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.value() == other.0.value()
+    }
+}
+
+impl<'a, A: Clone> Eq for LazyVec<'a, A> {}
 
 #[cfg(test)]
 mod tests {
