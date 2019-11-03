@@ -5,6 +5,7 @@ extern crate rand;
 extern crate rand_core;
 
 pub mod gen;
+#[macro_use]
 pub mod lazy;
 pub mod property;
 pub mod random;
