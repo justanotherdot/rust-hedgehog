@@ -1,3 +1,4 @@
+use crate::lazy::LazyVec;
 use crate::range;
 use crate::range::Range;
 use crate::range::Size;
@@ -99,29 +100,26 @@ pub fn f32(range: Range<f32>) -> Random<f32> {
     })
 }
 
-pub fn replicate<'a, A>(times: usize, r: Random<'a, A>) -> Random<'a, Vec<A>>
+pub fn replicate<'a, A>(times: usize, r: Random<'a, A>) -> Random<'a, LazyVec<'a, A>>
 where
     A: Clone + 'a,
 {
     Rc::new(move |seed0: Seed, size: Size| {
         let mut k = times;
-        let mut acc = vec![];
+        let acc = LazyVec::empty();
         let mut seed = seed0;
-
         loop {
             if k <= 0 {
                 break;
             } else {
                 let (seed1, seed2) = seed::split(seed);
                 let x = unsafe_run(seed1, size, r.clone());
-                acc.insert(0, x);
-
+                let acc = acc.insert(0, x);
                 seed = seed2;
-                k = k-1;
+                k = k - 1;
                 continue;
             }
         }
-
         acc
     })
 }

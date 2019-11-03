@@ -31,7 +31,7 @@ where
         }
     }
 
-    pub fn map<B, F>(self, f: &'a F) -> Lazy<'a, B>
+    pub fn map<B, F>(self, f: F) -> Lazy<'a, B>
     where
         F: Fn(A) -> B + 'a,
         A: Clone + 'a,
@@ -64,13 +64,13 @@ where
     }
 }
 
-impl<'a, A: Clone> PartialEq for Lazy<'a, A> {
+impl<'a, A: Clone + PartialEq> PartialEq for Lazy<'a, A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
     }
 }
 
-impl<'a, A: Clone> Eq for Lazy<'a, A> {}
+impl<'a, A: Clone + Eq> Eq for Lazy<'a, A> {}
 
 #[derive(Clone, Debug)]
 pub struct LazyVec<'a, A: Clone>(Lazy<'a, Vec<Lazy<'a, A>>>);
@@ -86,6 +86,17 @@ impl<'a, A: Clone + 'a> LazyVec<'a, A> {
 
     pub fn from_vec(xs: Vec<Lazy<'a, A>>) -> LazyVec<'a, A> {
         LazyVec(Lazy::new(xs))
+    }
+
+    pub fn find<F>(&self, f: &'a F) -> Option<A>
+    where
+        F: Fn(A) -> bool + 'a,
+    {
+        self.0
+            .value()
+            .into_iter()
+            .find(|x| f(x.value()))
+            .map(|x| x.value())
     }
 
     pub fn len(&self) -> usize {
@@ -109,22 +120,22 @@ impl<'a, A: Clone + 'a> LazyVec<'a, A> {
     }
 
     pub fn insert(self, pos: usize, elem: A) -> LazyVec<'a, A> {
-        LazyVec(self.0.map(&|xs| {
+        LazyVec(self.0.map(move |xs| {
             let mut xs0 = xs.clone();
-            xs0.insert(pos, Lazy::new(elem));
+            xs0.insert(pos, Lazy::new(elem.clone()));
             xs0
         }))
     }
 
     pub fn push(self, elem: A) -> LazyVec<'a, A> {
-        LazyVec(self.0.map(&|xs| {
+        LazyVec(self.0.map(move |xs| {
             let mut xs0 = xs.clone();
-            xs0.push(Lazy::new(elem));
+            xs0.push(Lazy::new(elem.clone()));
             xs0
         }))
     }
 
-    pub fn map<B, F>(self, f: &'a F) -> LazyVec<'a, B>
+    pub fn map<B, F>(self, f: Rc<F>) -> LazyVec<'a, B>
     where
         F: Fn(A) -> B + 'a,
         A: Clone + 'a,
@@ -132,8 +143,27 @@ impl<'a, A: Clone + 'a> LazyVec<'a, A> {
     {
         LazyVec(
             self.0
-                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().map(|x| x.map(f)).collect()),
+                .map(move |xs: Vec<Lazy<'a, A>>| xs.into_iter().map(|x| x.map(f)).collect()),
         )
+    }
+
+    pub fn for_each<F>(&self, f: &'a F)
+    where
+        F: Fn(A) -> () + 'a,
+    {
+        self.0.value().into_iter().for_each(|x| f(x.value()));
+    }
+
+    pub fn fold<B, F>(&self, initial: B, f: &F) -> B
+    where
+        F: Fn(B, A) -> B + 'a,
+        B: Clone + 'a,
+    {
+        self.0
+            .value()
+            .into_iter()
+            .map(|x| x.value())
+            .fold(initial, f)
     }
 
     pub fn first(&self) -> Option<A> {
@@ -143,18 +173,18 @@ impl<'a, A: Clone + 'a> LazyVec<'a, A> {
     pub fn take(self, n: usize) -> LazyVec<'a, A> {
         LazyVec(
             self.0
-                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().take(1).collect()),
+                .map(move |xs: Vec<Lazy<'a, A>>| xs.into_iter().take(n).collect()),
         )
     }
 
     pub fn skip(self, n: usize) -> LazyVec<'a, A> {
         LazyVec(
             self.0
-                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().skip(1).collect()),
+                .map(move |xs: Vec<Lazy<'a, A>>| xs.into_iter().skip(n).collect()),
         )
     }
 
-    pub fn get(self, n: usize) -> Option<A> {
+    pub fn get(&self, n: usize) -> Option<A> {
         self.0.value().get(n).map(|x| x.value())
     }
 
@@ -178,7 +208,7 @@ impl<'a, A: Clone + 'a> LazyVec<'a, A> {
     {
         LazyVec(
             self.0
-                .map(&|xs: Vec<Lazy<'a, A>>| xs.into_iter().filter(|x| f(x.value())).collect()),
+                .map(move |xs: Vec<Lazy<'a, A>>| xs.into_iter().filter(|x| f(x.value())).collect()),
         )
     }
 
@@ -221,13 +251,13 @@ macro_rules! lazy_vec(
     }
 );
 
-impl<'a, A: Clone> PartialEq for LazyVec<'a, A> {
+impl<'a, A: Clone + PartialEq> PartialEq for LazyVec<'a, A> {
     fn eq(&self, other: &Self) -> bool {
         self.0.value() == other.0.value()
     }
 }
 
-impl<'a, A: Clone> Eq for LazyVec<'a, A> {}
+impl<'a, A: Clone + Eq> Eq for LazyVec<'a, A> {}
 
 #[cfg(test)]
 mod tests {

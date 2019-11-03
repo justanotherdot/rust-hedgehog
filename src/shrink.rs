@@ -16,10 +16,10 @@ where
     let cons_nub_do = move |ys0: LazyVec<'a, A>| match ys0.first() {
         None => LazyVec::empty(),
         Some(y) if x == y => ys0,
-        Some(_) => ys0.map(|ys2| {
-            ys2.insert(0, x);
-            ys2
-        }),
+        Some(_) => {
+            ys0.insert(0, x);
+            ys0
+        }
     };
     Box::new(cons_nub_do)
 }
@@ -50,8 +50,8 @@ where
 {
     fn loop0<'b, C, D>(k: C, n: C, xs: LazyVec<'b, D>) -> LazyVec<'b, LazyVec<'b, D>>
     where
-        C: Integer + FromPrimitive + Copy,
-        D: Clone,
+        C: Integer + FromPrimitive + Copy + 'b,
+        D: Clone + 'b,
     {
         let hd = &xs.clone().take(1).get(0).unwrap();
         let tl: LazyVec<_> = xs.clone().skip(1);
@@ -60,9 +60,9 @@ where
         } else if tl.is_empty() {
             LazyVec::singleton(LazyVec::empty())
         } else {
-            let inner: LazyVec<_> = loop0(k, n - k, tl.clone()).map(move |mut x| {
+            let inner: LazyVec<_> = loop0(k, n - k, tl.clone()).map(move |x| {
                 let hd = hd.clone();
-                x.push(hd);
+                let x = x.push(hd);
                 x
             });
             let inner = inner.insert(0, tl);
@@ -84,7 +84,7 @@ where
         let xs01 = xs00.clone().take(1);
         let x0 = xs01.get(0).unwrap();
         let xs0: LazyVec<_> = xs00.skip(1);
-        let ys: LazyVec<_> = shrink(x0.clone()).map(&|x1| {
+        let ys: LazyVec<_> = shrink(x0.clone()).map(move |x1| {
             let vs = LazyVec::singleton(x1);
             vs.append(xs0);
             vs
@@ -175,7 +175,7 @@ where
     F: Fn(LazyVec<'a, Tree<'a, A>>) -> LazyVec<'a, LazyVec<'a, Tree<'a, A>>> + 'a,
 {
     let y = xs.clone().map(&|t| tree::outcome(t));
-    let ys = merge(xs).map(&|v| sequence(merge.clone(), v));
+    let ys = merge(xs).map(move |v| sequence(merge.clone(), v));
     Tree::new(y, ys)
 }
 

@@ -40,7 +40,7 @@ where
     {
         let mut children: LazyVec<Tree<'a, A>> = t
             .children
-            .map(&|t: Tree<'a, A>| Self::expand(f.clone(), t.clone()));
+            .map(move |t: Tree<'a, A>| Self::expand(f.clone(), t.clone()));
         let zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
         let children = children.append(zs);
         Tree::new(t.value(), children)
@@ -194,7 +194,7 @@ where
     F: Fn(A) -> B + 'a,
 {
     let x = f(t.value());
-    let xs = t.children.map(&|c| map(f.clone(), c));
+    let xs = t.children.map(move |c| map(f.clone(), c));
     Tree::new(x, xs)
 }
 

@@ -44,7 +44,7 @@ where
 pub fn create<'a, A, F>(shrink: Rc<F>, random: Random<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: Fn(A) -> Vec<A> + 'a,
+    F: Fn(A) -> LazyVec<'a, A> + 'a,
 {
     let expand = Rc::new(move |x| x);
     let shrink: Rc<F> = shrink.into();
@@ -80,7 +80,7 @@ where
 pub fn shrink<'a, F, A>(f: Rc<F>, g: Gen<'a, A>) -> Gen<'a, A>
 where
     A: Clone + 'a,
-    F: Fn(A) -> Vec<A> + 'a,
+    F: Fn(A) -> LazyVec<'a, A> + 'a,
 {
     map_tree(Rc::new(move |t| Tree::expand(f.clone(), t)), g)
 }
@@ -491,14 +491,14 @@ pub fn alphanum<'a>() -> Gen<'a, char> {
     choice(vec![lower(), upper(), digit()].into_iter())
 }
 
-pub fn at_least<'a, A>(n: usize, xs: Vec<A>) -> bool
+pub fn at_least<'a, A>(n: usize, xs: LazyVec<'a, A>) -> bool
 where
     A: Clone + 'a,
 {
-    n == 0 || !(xs.into_iter().skip(n - 1).collect::<Vec<A>>().is_empty())
+    n == 0 || !(xs.skip(n - 1).is_empty())
 }
 
-pub fn vec<'a, A>(range: Range<'a, usize>, g: Gen<'a, A>) -> Gen<'a, Vec<A>>
+pub fn vec<'a, A>(range: Range<'a, usize>, g: Gen<'a, A>) -> Gen<'a, LazyVec<'a, A>>
 where
     A: Clone + 'a,
 {
@@ -510,10 +510,11 @@ where
             Rc::new(move |k| {
                 let g = g.clone();
                 let range = range.clone();
-                let r: Random<'a, Vec<Tree<'a, A>>> = random::replicate(k, to_random(g.clone()));
+                let r: Random<'a, LazyVec<'a, Tree<'a, A>>> =
+                    random::replicate(k, to_random(g.clone()));
                 let h = Rc::new(move |r| {
                     let range = range.clone();
-                    let r0: Tree<'a, Vec<A>> = shrink::sequence_list(r);
+                    let r0: Tree<'a, LazyVec<'a, A>> = shrink::sequence_list(r);
                     let f = Rc::new(move |xs| {
                         let range = range.clone();
                         at_least(range::lower_bound(size, range), xs)
@@ -530,10 +531,12 @@ where
 /// valid UTF-8 on construction (per Rust's `String` type).
 pub fn string<'a>(range: Range<'a, usize>, g: Gen<'a, char>) -> Gen<'a, String> {
     map(
-        Rc::new(move |cs: Vec<char>| {
-            let mut s = String::with_capacity(cs.len());
-            cs.into_iter().for_each(|c| s.push(c));
-            s
+        Rc::new(move |cs: LazyVec<char>| {
+            let s = String::with_capacity(cs.len());
+            cs.fold(s, &|mut s, c| {
+                s.push(c);
+                s
+            })
         }),
         sized(Rc::new(move |_size| vec(range.clone(), g.clone()))),
     )
@@ -604,7 +607,7 @@ pub fn f32<'a>(range: Range<'a, f32>) -> Gen<'a, f32> {
 //   guid
 //   datetime
 
-pub fn sample_tree<'a, A>(size: Size, count: usize, g: Gen<'a, A>) -> Vec<Tree<'a, A>>
+pub fn sample_tree<'a, A>(size: Size, count: usize, g: Gen<'a, A>) -> LazyVec<'a, Tree<'a, A>>
 where
     A: Clone + 'a,
 {
@@ -612,14 +615,11 @@ where
     random::run(seed, size, random::replicate(count, to_random(g)))
 }
 
-pub fn sample<'a, A>(size: Size, count: usize, g: Gen<'a, A>) -> Vec<A>
+pub fn sample<'a, A>(size: Size, count: usize, g: Gen<'a, A>) -> LazyVec<'a, A>
 where
     A: Clone + 'a,
 {
-    sample_tree(size, count, g)
-        .into_iter()
-        .map(move |t| tree::outcome(t))
-        .collect()
+    sample_tree(size, count, g).map(&|t| tree::outcome(t))
 }
 
 pub fn generate_tree<A>(g: Gen<A>) -> Tree<A>
@@ -635,11 +635,11 @@ where
     A: Clone + Debug + 'a,
 {
     let forest = sample_tree(Size(30), 5, g);
-    forest.into_iter().for_each(|t| {
+    forest.for_each(&|t| {
         println!("=== Outcome ===");
         println!("{:?}", tree::outcome(&t));
         println!("=== Shrinks ===");
-        tree::shrinks(t).iter().for_each(|s| {
+        tree::shrinks(t).for_each(&|s| {
             println!("{:?}", tree::outcome(s));
         });
         println!(".");
