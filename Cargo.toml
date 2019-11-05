@@ -7,8 +7,8 @@ authors = ["Ryan James Spencer <spencer.ryanjames@gmail.com>"]
 num = "0.2"
 num-traits = "0.2"
 num-derive = "0.3"
-rand = "0.6"
-rand_core = "0.4"
+rand = "0.7"
+rand_core = "0.5"
 
 [profile.release]
 debug = true
