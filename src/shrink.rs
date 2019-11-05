@@ -11,7 +11,7 @@ use std::rc::Rc;
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
 // pipeline a la the F# port.
-fn cons_nub<'a, A: 'a>(x: A) -> Box<dyn Fn(Vec<A>) -> Vec<A> + 'a>
+fn cons_nub<A>(x: A) -> Box<dyn Fn(Vec<A>) -> Vec<A>>
 where
     A: Integer + FromPrimitive + Copy,
 {
@@ -131,9 +131,8 @@ where
 }
 
 /// Shrink an integral number by edging towards a destination.
-pub fn towards<'a, A>(destination: A, x: A) -> Vec<A>
+pub fn towards<A>(destination: A, x: A) -> Vec<A>
 where
-    A: 'a,
     A: Integer + FromPrimitive + Copy,
 {
     if destination == x {
@@ -151,7 +150,7 @@ where
 // TODO: rename to monomorphic variant.
 /// Shrink a floating-point number by edging towards a destination.
 /// Note we always try the destination first, as that is the optimal shrink.
-pub fn towards_float<'a, A: 'a>(destination: A, x: A) -> Vec<A>
+pub fn towards_float<A>(destination: A, x: A) -> Vec<A>
 where
     A: Float + FromPrimitive + Copy,
 {
@@ -186,11 +185,11 @@ where
         .collect()
 }
 
-pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence<A, F>(merge: Rc<F>, xs: Vec<Tree<A>>) -> Tree<Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone,
     // FIX: This is a bit silly because we don't have a LazyList type.
-    F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
+    F: Fn(Vec<Tree<A>>) -> Vec<Vec<Tree<A>>>,
 {
     let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
     let ys = merge(xs)
@@ -200,12 +199,12 @@ where
     Tree::new(y, ys)
 }
 
-pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_list<A>(xs0: Vec<Tree<A>>) -> Tree<Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone,
 {
     sequence(
-        Rc::new(move |xs: Vec<Tree<'a, A>>| {
+        Rc::new(move |xs: Vec<Tree<A>>| {
             let ys = xs.clone();
             let mut shrinks = vec(xs);
             let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
@@ -216,9 +215,9 @@ where
     )
 }
 
-pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_elems<A>(xs0: Vec<Tree<A>>) -> Tree<Vec<A>>
 where
-    A: Clone + 'a,
+    A: Clone,
 {
     sequence(
         Rc::new(move |xs| elems(Rc::new(move |t| tree::shrinks(t)), xs)),

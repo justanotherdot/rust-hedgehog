@@ -451,7 +451,7 @@ pub mod property {
             tests: isize,
             discards: isize,
             n: isize,
-            random: Random<'a, Tree<'a, (Journal, Result<()>)>>,
+            random: Random<'a, Tree<(Journal, Result<()>)>>,
             next_size: F,
         ) -> Report
         where

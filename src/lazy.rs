@@ -9,21 +9,15 @@ macro_rules! lazy(
     }
 );
 
-// TODO: For the moment we use RefCell but if someone tries to force a value on the same node at
-// the same time e.g. in parallel, this might cause a panic. This may not actually be a concern.
-#[derive(Clone)]
 pub struct Lazy<'a, A> {
     value: RefCell<Option<A>>,
     closure: Rc<dyn Fn() -> A + 'a>,
 }
 
-impl<'a, A> Lazy<'a, A>
-where
-    A: Clone + 'a,
-{
+impl<'a, A: 'a> Lazy<'a, A> {
     pub fn new(value: A) -> Lazy<'a, A> {
         Lazy {
-            closure: Rc::new(move || value.clone()),
+            closure: Rc::new(move || value),
             value: RefCell::new(None),
         }
     }
@@ -56,7 +50,7 @@ where
 
     pub fn value(&self) -> A {
         self.force();
-        self.value.clone().into_inner().unwrap()
+        self.value.into_inner().unwrap()
     }
 }
 
