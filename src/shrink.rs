@@ -5,32 +5,22 @@ use crate::tree;
 use crate::tree::Tree;
 use std::rc::Rc;
 
-// TODO: missing:
-//   * sequenceElems
-
-// This probably could be optimised for an eager language. by simply manipulating the vector
-// directly and doing the inner check, rather than returning the function here for use in a
-// pipeline a la the F# port.
-fn cons_nub<A: 'static>(
-    x: A,
-) -> Box<dyn Fn(Box<dyn Iterator<Item = A>>) -> Box<dyn Iterator<Item = A>>>
+fn cons_nub<A: 'static>(x: A, ys0: Box<dyn Iterator<Item = A>>) -> Box<dyn Iterator<Item = A>>
 where
     A: Integer + FromPrimitive + Copy,
 {
-    let cons_nub_do = move |ys0: Box<dyn Iterator<Item = A>>| match ys0.first() {
-        None => vec![],
+    match ys0.first() {
+        None => Box::new(vec![].into_iter()),
         Some(&y) if x == y => ys0,
         Some(_) => {
-            let mut ys1 = ys0;
-            ys1.insert(0, x);
-            ys1
+            ys0.insert(0, x);
+            ys0
         }
-    };
-    Box::new(cons_nub_do)
+    }
 }
 
 // TODO: This function could just be a loop.
-fn unfold<A, B, F>(f: F, b0: B) -> Box<dyn Iterator<Item = A>>
+fn unfold<A: 'static, B: 'static, F: 'static>(f: F, b0: B) -> Box<dyn Iterator<Item = A>>
 where
     F: Fn(B) -> Option<(A, B)>,
 {
@@ -45,7 +35,7 @@ where
             break;
         }
     }
-    acc
+    Box::new(acc.into_iter())
 }
 
 pub fn removes<A, B>(
@@ -149,14 +139,14 @@ where
     A: Integer + FromPrimitive + Copy,
 {
     if destination == x {
-        vec![]
+        Box::new(vec![].into_iter())
     } else {
         // We need to halve our operands before subtracting them as they may be using
         // the full range of the type (i.e. 'MinValue' and 'MaxValue' for 'Int32')
         let two = FromPrimitive::from_isize(2).unwrap();
         let diff = (x / two) - (destination / two);
 
-        cons_nub(destination)(halves(diff).into_iter().map(|y| x - y).collect())
+        cons_nub(destination, halves(diff).map(|y| x - y))
     }
 }
 
