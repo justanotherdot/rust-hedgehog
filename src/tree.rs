@@ -10,15 +10,15 @@ pub struct Tree<A> {
     pub children: Box<dyn Iterator<Item = Tree<A>>>,
 }
 
-impl<A> Tree<A> {
+impl<A: 'static> Tree<A> {
     pub fn new(value: A, children: Box<dyn Iterator<Item = Tree<A>>>) -> Self {
-        let thunk = Lazy::new(value);
+        let thunk = value;
         Tree { thunk, children }
     }
 
     pub fn singleton(value: A) -> Tree<A> {
         Tree {
-            thunk: Lazy::new(value),
+            thunk: value,
             children: Box::new(vec![].into_iter()),
         }
     }
@@ -29,7 +29,7 @@ impl<A> Tree<A> {
 
     pub fn expand<F>(f: Rc<F>, t: Tree<A>) -> Tree<A>
     where
-        F: Fn(A) -> Box<dyn Iterator<Item = A>>,
+        F: Fn(A) -> Box<dyn Iterator<Item = A>> + 'static + 'static,
     {
         let mut children = Box::new(t.children.map(|t| Self::expand(f, t)));
         let zs = unfold_forest(Rc::new(move |x| x), f, t.value());
@@ -38,9 +38,9 @@ impl<A> Tree<A> {
     }
 }
 
-pub fn bind<A, B, F>(t: Tree<A>, k: Rc<F>) -> Tree<B>
+pub fn bind<A: 'static, B: 'static, F>(t: Tree<A>, k: Rc<F>) -> Tree<B>
 where
-    F: Fn(A) -> Tree<B>,
+    F: Fn(A) -> Tree<B> + 'static,
 {
     let x = t.value();
     let xs0 = t.children;
@@ -53,34 +53,38 @@ where
     }
 }
 
-pub fn join<A>(tss: Tree<Tree<A>>) -> Tree<A> {
+pub fn join<A: 'static>(tss: Tree<Tree<A>>) -> Tree<A> {
     bind(tss, Rc::new(move |x| x))
 }
 
-pub fn duplicate<A>(t: Tree<A>) -> Tree<Tree<A>> {
+pub fn duplicate<A: 'static>(t: Tree<A>) -> Tree<Tree<A>> {
     let xs = Box::new(t.children.map(|x| duplicate(x)));
     Tree::new(t, xs)
 }
 
-pub fn fold<A, X, B, F, G>(f: &F, g: &G, t: Tree<A>) -> B
+pub fn fold<A: 'static, X: 'static, B: 'static, F, G>(f: &'static F, g: &'static G, t: Tree<A>) -> B
 where
-    F: Fn(A, X) -> B,
-    G: Fn(Box<dyn Iterator<Item = B>>) -> X,
+    F: Fn(A, X) -> B + 'static,
+    G: Fn(Box<dyn Iterator<Item = B>>) -> X + 'static,
 {
     let x = t.value();
     let xs = t.children;
     f(x, fold_forest(f, g, xs))
 }
 
-pub fn fold_forest<A, X, B, F, G>(f: &F, g: &G, xs: Box<dyn Iterator<Item = Tree<A>>>) -> X
+pub fn fold_forest<A: 'static, X: 'static, B: 'static, F, G>(
+    f: &'static F,
+    g: &'static G,
+    xs: Box<dyn Iterator<Item = Tree<A>>>,
+) -> X
 where
-    F: Fn(A, X) -> B,
-    G: Fn(Box<dyn Iterator<Item = B>>) -> X,
+    F: Fn(A, X) -> B + 'static,
+    G: Fn(Box<dyn Iterator<Item = B>>) -> X + 'static,
 {
     g(Box::new(xs.map(|x| fold(f, g, x))))
 }
 
-impl<A> PartialEq for Tree<A>
+impl<A: 'static> PartialEq for Tree<A>
 where
     A: PartialEq,
 {
@@ -94,23 +98,27 @@ where
 }
 
 /// Build a tree from an unfolding function and a seed value.
-pub fn unfold<A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Tree<A>
+pub fn unfold<A: 'static, B: 'static, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Tree<A>
 where
-    F: Fn(B) -> A,
-    G: Fn(B) -> Box<dyn Iterator<Item = B>>,
+    F: Fn(B) -> A + 'static,
+    G: Fn(B) -> Box<dyn Iterator<Item = B>> + 'static,
 {
     let y = f(x);
     Tree {
-        thunk: Lazy::new(y),
+        thunk: y,
         children: unfold_forest(f, g, x),
     }
 }
 
 /// Build a list of trees from an unfolding function and a seed value.
-pub fn unfold_forest<A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Box<dyn Iterator<Item = Tree<A>>>
+pub fn unfold_forest<A: 'static, B: 'static, F, G>(
+    f: Rc<F>,
+    g: Rc<G>,
+    x: B,
+) -> Box<dyn Iterator<Item = Tree<A>>>
 where
-    F: Fn(B) -> A,
-    G: Fn(B) -> Box<dyn Iterator<Item = B>>,
+    F: Fn(B) -> A + 'static,
+    G: Fn(B) -> Box<dyn Iterator<Item = B>> + 'static,
 {
     Box::new(g(x).map(move |v| unfold(f, g, v)))
 }
@@ -124,39 +132,39 @@ impl<A> AsRef<Tree<A>> for Tree<A> {
 
 // TODO: iiuc this is just `value`.
 // TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L12-L13
-pub fn outcome<A, T>(t: T) -> A
+pub fn outcome<A: 'static, T>(t: T) -> A
 where
     T: AsRef<Tree<A>>,
 {
     t.as_ref().value()
 }
 
-pub fn shrinks<A>(t: Tree<A>) -> Box<dyn Iterator<Item = Tree<A>>> {
+pub fn shrinks<A: 'static>(t: Tree<A>) -> Box<dyn Iterator<Item = Tree<A>>> {
     t.children
 }
 
 // TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
-pub fn filter<A, F>(f: Rc<F>, t: Tree<A>) -> Tree<A>
+pub fn filter<A: 'static, F>(f: Rc<F>, t: Tree<A>) -> Tree<A>
 where
-    F: Fn(A) -> bool,
+    F: Fn(A) -> bool + 'static,
 {
     Tree::new(t.value(), filter_forest(f, t.children))
 }
 
-pub fn filter_forest<A, F>(
+pub fn filter_forest<A: 'static, F>(
     f: Rc<F>,
     xs: Box<dyn Iterator<Item = Tree<A>>>,
 ) -> Box<dyn Iterator<Item = Tree<A>>>
 where
-    F: Fn(A) -> bool,
+    F: Fn(A) -> bool + 'static,
 {
     Box::new(xs.filter(|x| f(outcome(x))).map(|x| filter(f, x)))
 }
 
-pub fn map<A, B, F>(f: Rc<F>, t: Tree<A>) -> Tree<B>
+pub fn map<A: 'static, B: 'static, F>(f: Rc<F>, t: Tree<A>) -> Tree<B>
 where
     A: 'static,
-    F: Fn(A) -> B + 'static,
+    F: Fn(A) -> B + 'static + 'static,
 {
     let x = f(t.value());
     let xs = Box::new(t.children.map(move |c| map(f, c)));
@@ -178,7 +186,7 @@ fn shift(head: &str, other: &str, lines: Vec<String>) -> Vec<String> {
     out
 }
 
-fn render_forest_lines<A>(limit: i16, forest: &[Tree<A>]) -> Vec<String>
+fn render_forest_lines<A: 'static>(limit: i16, forest: &[Tree<A>]) -> Vec<String>
 where
     A: Debug,
 {
@@ -205,7 +213,7 @@ where
     }
 }
 
-fn render_tree_lines<A>(limit: i16, x: &Tree<A>) -> Vec<String>
+fn render_tree_lines<A: 'static>(limit: i16, x: &Tree<A>) -> Vec<String>
 where
     A: Debug,
 {
@@ -217,7 +225,7 @@ where
     children
 }
 
-impl<A> Display for Tree<A>
+impl<A: 'static> Display for Tree<A>
 where
     A: Copy + Debug,
 {
