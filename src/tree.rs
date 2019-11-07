@@ -25,6 +25,7 @@ impl<A> Tree<A> {
 
     pub fn expand<F>(f: Rc<F>, t: &Tree<A>) -> Tree<A>
     where
+        A: Clone,
         F: Fn(&A) -> Vec<A>,
     {
         let mut children: Vec<Tree<A>> = t
@@ -32,7 +33,7 @@ impl<A> Tree<A> {
             .iter()
             .map(move |t| Self::expand(f.clone(), t))
             .collect();
-        let mut zs = unfold_forest(Rc::new(|x| x), f, &t.value());
+        let mut zs = unfold_forest(Rc::new(|x: &A| x.clone()), f, &t.value());
         children.append(&mut zs);
         Tree::new(t.value(), children)
     }
@@ -111,7 +112,7 @@ where
     G: Fn(&B) -> Vec<B>,
 {
     g(x).iter()
-        .map(move |v| unfold(f.clone(), g.clone(), v))
+        .map(|v| unfold(f.clone(), g.clone(), v))
         .collect()
 }
 

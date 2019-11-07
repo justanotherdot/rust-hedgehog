@@ -1,7 +1,6 @@
 use num::{Bounded, Float, FromPrimitive, Integer, Num, ToPrimitive};
 use std::rc::Rc;
 
-//#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Num)]
 #[derive(
     Debug,
     Clone,
@@ -20,19 +19,18 @@ use std::rc::Rc;
 )]
 pub struct Size(pub isize);
 
-#[derive(Clone)]
-pub struct Range<'a, A: 'a>(A, Rc<dyn Fn(Size) -> (A, A) + 'a>);
+pub struct Range<'a, A: 'a>(A, Rc<dyn Fn(&Size) -> (A, A) + 'a>);
 
 impl<'a, A> Range<'a, A> {
-    pub fn map<F, B>(f: F, Range(z, g): Range<'a, A>) -> Range<'a, B>
+    pub fn map<F, B>(f: F, Range(z, g): &'a Range<'a, A>) -> Range<'a, B>
     where
-        F: Fn(A) -> B + 'a,
+        F: Fn(&A) -> B + 'a,
     {
         Range(
             f(z),
-            Rc::new(move |sz| {
+            Rc::new(|sz| {
                 let (a, b) = g(sz);
-                (f(a), f(b))
+                (f(&a), f(&b))
             }),
         )
     }
@@ -42,11 +40,11 @@ pub fn origin<A>(Range(z, _): Range<A>) -> A {
     z
 }
 
-pub fn bounds<A>(sz: Size, Range(_, f): Range<A>) -> (A, A) {
+pub fn bounds<A>(sz: &Size, Range(_, f): &Range<A>) -> (A, A) {
     f(sz)
 }
 
-pub fn lower_bound<A>(sz: Size, range: Range<A>) -> A
+pub fn lower_bound<A>(sz: &Size, range: &Range<A>) -> A
 where
     A: Ord,
 {
@@ -54,7 +52,7 @@ where
     std::cmp::min(x, y)
 }
 
-pub fn upper_bound<A>(sz: Size, range: Range<A>) -> A
+pub fn upper_bound<A>(sz: &Size, range: &Range<A>) -> A
 where
     A: Ord,
 {
@@ -62,32 +60,21 @@ where
     std::cmp::max(x, y)
 }
 
-// FIXME lots of clones here the Haskell variant is probably simply using references to the same
-// one. So it might make sense to refactor this as an Rc around A.
-pub fn singleton<'a, A>(x: A) -> Range<'a, A>
-where
-    A: Clone,
-{
-    Range(x.clone(), Rc::new(move |_| (x.clone(), x.clone())))
+pub fn singleton<'a, A>(x: A) -> Range<'a, A> {
+    Range(x, Rc::new(|_| (x, x)))
 }
 
-pub fn constant<'a, A>(x: A, y: A) -> Range<'a, A>
-where
-    A: Clone,
-{
-    constant_from(x.clone(), x, y)
+pub fn constant<'a, A>(x: A, y: A) -> Range<'a, A> {
+    constant_from(x, x, y)
 }
 
-pub fn constant_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
-where
-    A: Clone,
-{
-    Range(z, Rc::new(move |_| (x.clone(), y.clone())))
+pub fn constant_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A> {
+    Range(z, Rc::new(|_| (x, y)))
 }
 
 pub fn constant_bounded<'a, A>() -> Range<'a, A>
 where
-    A: Num + Bounded + Clone + FromPrimitive,
+    A: Num + Bounded + FromPrimitive,
 {
     constant_from(
         FromPrimitive::from_isize(0).unwrap(),
@@ -98,28 +85,20 @@ where
 
 pub fn linear<'a, A>(x: A, y: A) -> Range<'a, A>
 where
-    A: Integer + Clone + FromPrimitive,
+    A: Integer + FromPrimitive,
 {
-    linear_from(x.clone(), x, y)
+    linear_from(x, x, y)
 }
 
 pub fn linear_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
 where
-    A: Integer + Clone + FromPrimitive,
+    A: Integer + FromPrimitive,
 {
     Range(
-        z.clone(),
-        Rc::new(move |sz| {
-            let x_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_linear(sz.clone(), z.clone(), x.clone()),
-            );
-            let y_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_linear(sz.clone(), z.clone(), y.clone()),
-            );
+        z,
+        Rc::new(|sz| {
+            let x_sized = clamp(x, y, scale_linear(sz, z, x));
+            let y_sized = clamp(x, y, scale_linear(sz, z, y));
 
             (x_sized, y_sized)
         }),
@@ -128,7 +107,7 @@ where
 
 pub fn linear_bounded<'a, A>() -> Range<'a, A>
 where
-    A: Bounded + Integer + Clone + FromPrimitive,
+    A: Bounded + Integer + FromPrimitive,
 {
     let zero = FromPrimitive::from_isize(0).unwrap();
     linear_from(zero, A::min_value(), A::max_value())
@@ -147,28 +126,20 @@ where
 
 pub fn linear_frac<'a, A>(x: A, y: A) -> Range<'a, A>
 where
-    A: Num + Clone + Ord + FromPrimitive,
+    A: Num + Ord + FromPrimitive,
 {
-    linear_frac_from(x.clone(), x, y)
+    linear_frac_from(x, x, y)
 }
 
 pub fn linear_frac_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
 where
-    A: Num + Ord + FromPrimitive + Clone,
+    A: Num + Ord + FromPrimitive,
 {
     Range(
-        z.clone(),
-        Rc::new(move |sz| {
-            let x_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_linear_frac(sz.clone(), z.clone(), x.clone()),
-            );
-            let y_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_linear_frac(sz.clone(), z.clone(), y.clone()),
-            );
+        z,
+        Rc::new(|sz| {
+            let x_sized = clamp(x, y, scale_linear_frac(sz, z, x));
+            let y_sized = clamp(x, y, scale_linear_frac(sz, z, y));
             (x_sized, y_sized)
         }),
     )
@@ -176,14 +147,14 @@ where
 
 pub fn scale_linear<'a, A>(sz0: Size, z0: A, n0: A) -> A
 where
-    A: Integer + FromPrimitive + Clone,
+    A: Integer + FromPrimitive,
 {
     let zero = FromPrimitive::from_isize(0).unwrap();
     let ninety_nine_sz = FromPrimitive::from_isize(99).unwrap();
     let sz = std::cmp::max(zero, std::cmp::min(ninety_nine_sz, sz0));
     let sz1 = FromPrimitive::from_isize(sz.0).unwrap();
     let ninety_nine: A = FromPrimitive::from_isize(99).unwrap();
-    let (diff, _) = Integer::div_rem(&((n0 - z0.clone()) * sz1), &ninety_nine);
+    let (diff, _) = Integer::div_rem(&((n0 - z0) * sz1), &ninety_nine);
     z0 + diff
 }
 
@@ -191,14 +162,14 @@ where
 // although Ratio and Rational are not traits!
 pub fn scale_linear_frac<'a, A>(sz0: Size, z0: A, n0: A) -> A
 where
-    A: Num + Ord + FromPrimitive + Clone,
+    A: Num + Ord + FromPrimitive,
 {
     let zero = FromPrimitive::from_isize(0).unwrap();
     let ninety_nine_sz = FromPrimitive::from_isize(99).unwrap();
     let sz = std::cmp::max(zero, std::cmp::min(ninety_nine_sz, sz0));
     let sz1: A = FromPrimitive::from_isize(sz.0).unwrap();
     let ninety_nine: A = FromPrimitive::from_isize(99).unwrap();
-    let diff = (n0 - z0.clone()) * (sz1 / ninety_nine);
+    let diff = (n0 - z0) * (sz1 / ninety_nine);
     z0 + diff
 }
 
@@ -208,28 +179,20 @@ where
 // that rust will figure it out for us.
 pub fn exponential<'a, A>(x: A, y: A) -> Range<'a, A>
 where
-    A: Integer + Float + Clone + ToPrimitive + FromPrimitive,
+    A: Integer + Float + ToPrimitive + FromPrimitive,
 {
-    exponential_from(x.clone(), x, y)
+    exponential_from(x, x, y)
 }
 
 pub fn exponential_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
 where
-    A: Clone + Ord + Integer + Float + ToPrimitive + FromPrimitive,
+    A: Ord + Integer + Float + ToPrimitive + FromPrimitive,
 {
     Range(
-        z.clone(),
-        Rc::new(move |sz| {
-            let x_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_exponential(sz, z.clone(), x.clone()),
-            );
-            let y_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_exponential(sz, z.clone(), y.clone()),
-            );
+        z,
+        Rc::new(|sz| {
+            let x_sized = clamp(x, y, scale_exponential(sz, z, x));
+            let y_sized = clamp(x, y, scale_exponential(sz, z, y));
             (x_sized, y_sized)
         }),
     )
@@ -247,7 +210,7 @@ pub fn exponential_float<'a, A>(x: A, y: A) -> Range<'a, A>
 where
     A: Float + Ord + FromPrimitive,
 {
-    exponential_float_from(x.clone(), x, y)
+    exponential_float_from(x, x, y)
 }
 
 pub fn exponential_float_from<'a, A>(z: A, x: A, y: A) -> Range<'a, A>
@@ -255,18 +218,10 @@ where
     A: Float + Ord + FromPrimitive,
 {
     Range(
-        z.clone(),
-        Rc::new(move |sz| {
-            let x_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_exponential_float(sz, z.clone(), x.clone()),
-            );
-            let y_sized = clamp(
-                x.clone(),
-                y.clone(),
-                scale_exponential_float(sz, z.clone(), y.clone()),
-            );
+        z,
+        Rc::new(|sz| {
+            let x_sized = clamp(x, y, scale_exponential_float(sz, z, x));
+            let y_sized = clamp(x, y, scale_exponential_float(sz, z, y));
             (x_sized, y_sized)
         }),
     )

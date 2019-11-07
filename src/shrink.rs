@@ -74,7 +74,7 @@ where
 
 pub fn elems<A, F>(shrink: Rc<F>, xs00: Vec<A>) -> Vec<Vec<A>>
 where
-    F: Fn(A) -> Vec<A>,
+    F: Fn(&A) -> Vec<A>,
 {
     if xs00.is_empty() {
         vec![]
@@ -82,7 +82,7 @@ where
         let xs01 = xs00.into_iter().take(1).collect::<Vec<_>>();
         let x0 = xs01.get(0).unwrap();
         let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
-        let mut ys: Vec<_> = shrink(&x0)
+        let mut ys: Vec<_> = shrink(x0)
             .into_iter()
             .map(|x1| {
                 let mut vs = vec![x1];
@@ -169,17 +169,15 @@ pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>> {
         .collect()
 }
 
-pub fn sequence<A, F>(
-    merge: Rc<F>,
-    xs: Box<dyn Iterator<Item = Tree<A>>>,
-) -> Tree<Box<dyn Iterator<Item = A>>>
+pub fn sequence<A, F>(merge: Rc<F>, xs: Vec<Tree<A>>) -> Tree<Vec<A>>
 where
-    F: Fn(
-        Box<dyn Iterator<Item = Tree<A>>>,
-    ) -> Box<dyn Iterator<Item = Box<dyn Iterator<Item = Tree<A>>>>>,
+    F: Fn(Vec<Tree<A>>) -> Vec<Vec<Tree<A>>>,
 {
-    let y = xs.map(|t| tree::outcome(&t));
-    let ys = Box::new(merge(xs).into_iter().map(|v| sequence(merge.clone(), v)));
+    let y = xs.into_iter().map(|t| tree::outcome(&t)).collect();
+    let ys = merge(xs)
+        .into_iter()
+        .map(|v| sequence(merge.clone(), v))
+        .collect();
     Tree::new(y, ys)
 }
 
