@@ -1,120 +1,86 @@
-use lazy::Lazy;
-use std::borrow::Borrow;
 use std::fmt;
 use std::fmt::{Debug, Display, Write};
 use std::rc::Rc;
 
-#[derive(Clone, Debug)]
-pub struct Tree<'a, A>
-where
-    A: Clone,
-{
-    thunk: Lazy<'a, A>,
-    pub children: Vec<Tree<'a, A>>,
+pub struct Tree<A> {
+    value: A,
+    pub children: Vec<Tree<A>>,
 }
 
-impl<'a, A> Tree<'a, A>
-where
-    A: 'a + Clone,
-{
-    pub fn new(value: A, children: Vec<Tree<'a, A>>) -> Self {
-        let thunk = Lazy::new(value);
-        Tree { thunk, children }
+impl<A> Tree<A> {
+    pub fn new(value: A, children: Vec<Tree<A>>) -> Self {
+        Tree { value, children }
     }
 
-    pub fn singleton(value: A) -> Tree<'a, A> {
+    pub fn singleton(value: A) -> Tree<A> {
         Tree {
-            thunk: Lazy::new(value),
+            value,
             children: vec![],
         }
     }
 
     pub fn value(&self) -> A {
-        self.thunk.value()
+        self.value
     }
 
-    pub fn expand<F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, A>
+    pub fn expand<F>(f: Rc<F>, t: &Tree<A>) -> Tree<A>
     where
-        F: Fn(A) -> Vec<A>,
+        F: Fn(&A) -> Vec<A>,
     {
-        let mut children: Vec<Tree<'a, A>> = t
+        let mut children: Vec<Tree<A>> = t
             .children
             .iter()
-            .map(|t| Self::expand(f.clone(), t.clone()))
+            .map(move |t| Self::expand(f.clone(), t))
             .collect();
-        let mut zs = unfold_forest(Rc::new(move |x| x), f.clone(), t.value());
+        let mut zs = unfold_forest(Rc::new(|x| x), f, &t.value());
         children.append(&mut zs);
         Tree::new(t.value(), children)
     }
 }
 
-pub fn bind<'a, A, B, F>(t: Tree<'a, A>, k: Rc<F>) -> Tree<'a, B>
+pub fn bind<A, B, F>(t: &Tree<A>, k: Rc<F>) -> Tree<B>
 where
-    A: Clone + 'a,
-    B: Clone + 'a,
-    F: Fn(A) -> Tree<'a, B> + 'a,
+    F: Fn(A) -> Tree<B>,
 {
     let x = t.value();
     let xs0 = t.children;
-    let mut t1 = k(x.clone());
-    let mut xs: Vec<Tree<'a, B>> = xs0.iter().map(|m| bind(m.clone(), k.clone())).collect();
+    let mut t1 = k(x);
+    let mut xs: Vec<Tree<B>> = xs0.iter().map(|m| bind(m, k.clone())).collect();
     xs.append(&mut t1.children);
     Tree {
-        thunk: t1.thunk,
+        value: t1.value,
         children: xs,
     }
 }
 
-pub fn join<'a, A>(tss: Tree<'a, Tree<'a, A>>) -> Tree<'a, A>
-where
-    A: Clone + 'a,
-{
+pub fn join<A>(tss: &Tree<Tree<A>>) -> Tree<A> {
     bind(tss, Rc::new(move |x| x))
 }
 
-pub fn duplicate<'a, A>(t: Tree<'a, A>) -> Tree<'a, Tree<'a, A>>
-where
-    A: Clone + 'a,
-{
-    let xs = t
-        .clone()
-        .children
-        .into_iter()
-        .map(|x| duplicate(x))
-        .collect();
+pub fn duplicate<A>(t: Tree<A>) -> Tree<Tree<A>> {
+    let xs = t.children.into_iter().map(|x| duplicate(x)).collect();
     Tree::new(t, xs)
 }
 
 pub fn fold<A, X, B, F, G>(f: &F, g: &G, t: Tree<A>) -> B
 where
-    A: Clone,
-    B: Clone,
-    X: Clone,
-    // TODO get rid of these static lifetimes
-    F: Fn(A, X) -> B + 'static,
-    G: Fn(Vec<B>) -> X + 'static,
+    F: Fn(A, X) -> B,
+    G: Fn(Vec<B>) -> X,
 {
     let x = t.value();
     let xs = t.children;
     f(x, fold_forest(f, g, xs))
 }
 
-pub fn fold_forest<'a, A, X, B, F, G>(f: &F, g: &G, xs: Vec<Tree<A>>) -> X
+pub fn fold_forest<A, X, B, F, G>(f: &F, g: &G, xs: Vec<Tree<A>>) -> X
 where
-    A: Clone,
-    B: Clone,
-    X: Clone,
-    // TODO get rid of these static lifetimes
-    F: Fn(A, X) -> B + 'static,
-    G: Fn(Vec<B>) -> X + 'static,
+    F: Fn(A, X) -> B,
+    G: Fn(Vec<B>) -> X,
 {
     g(xs.into_iter().map(|x| fold(f, g, x)).collect())
 }
 
-impl<'a, A> PartialEq for Tree<'a, A>
-where
-    A: 'a + Clone + PartialEq,
-{
+impl<A: PartialEq> PartialEq for Tree<A> {
     fn eq(&self, other: &Self) -> bool {
         self.value() == other.value()
             && self
@@ -126,73 +92,48 @@ where
 }
 
 /// Build a tree from an unfolding function and a seed value.
-pub fn unfold<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Tree<'a, A>
+pub fn unfold<A, B, F, G>(f: Rc<F>, g: Rc<G>, x: &B) -> Tree<A>
 where
-    A: Clone + 'a,
-    B: Clone + 'a,
-    F: Fn(B) -> A,
-    G: Fn(B) -> Vec<B>,
+    F: Fn(&B) -> A,
+    G: Fn(&B) -> Vec<B>,
 {
-    let y = f(x.clone());
+    let y = f(x);
     Tree {
-        thunk: Lazy::new(y),
+        value: y,
         children: unfold_forest(f.clone(), g.clone(), x),
     }
 }
 
 /// Build a list of trees from an unfolding function and a seed value.
-pub fn unfold_forest<'a, A, B, F, G>(f: Rc<F>, g: Rc<G>, x: B) -> Vec<Tree<'a, A>>
+pub fn unfold_forest<A, B, F, G>(f: Rc<F>, g: Rc<G>, x: &B) -> Vec<Tree<A>>
 where
-    A: Clone + 'a,
-    B: Clone + 'a,
-    F: Fn(B) -> A,
-    G: Fn(B) -> Vec<B>,
+    F: Fn(&B) -> A,
+    G: Fn(&B) -> Vec<B>,
 {
     g(x).iter()
-        .map(move |v| unfold(f.clone(), g.clone(), v.clone()))
+        .map(move |v| unfold(f.clone(), g.clone(), v))
         .collect()
 }
 
-// TODO: Not sure if this a poor pattern.
-impl<'a, A> AsRef<Tree<'a, A>> for Tree<'a, A>
-where
-    A: Clone + 'a,
-{
-    fn as_ref(&self) -> &Tree<'a, A> {
-        self.borrow()
-    }
+/// Alias for `value`.
+pub fn outcome<A>(t: &Tree<A>) -> A {
+    t.value()
 }
 
-// TODO: iiuc this is just `value`.
-// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L12-L13
-pub fn outcome<'a, A, T>(t: T) -> A
-where
-    A: Clone + 'a,
-    T: AsRef<Tree<'a, A>>,
-{
-    t.as_ref().value()
-}
-
-pub fn shrinks<A>(t: Tree<A>) -> Vec<Tree<A>>
-where
-    A: Clone,
-{
+pub fn shrinks<A>(t: Tree<A>) -> Vec<Tree<A>> {
     t.children
 }
 
-// TODO: https://github.com/hedgehogqa/fsharp-hedgehog/blob/master/src/Hedgehog/Tree.fs#L84-L87
-pub fn filter<'a, A, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, A>
+pub fn filter<A, F>(f: Rc<F>, t: Tree<A>) -> Tree<A>
 where
-    A: Clone + 'a,
-    F: Fn(A) -> bool + 'a,
+    F: Fn(A) -> bool,
 {
     Tree::new(t.value(), filter_forest(f.clone(), t.children))
 }
 
-pub fn filter_forest<'a, A, F>(f: Rc<F>, xs: Vec<Tree<'a, A>>) -> Vec<Tree<'a, A>>
+pub fn filter_forest<A, F>(f: Rc<F>, xs: Vec<Tree<A>>) -> Vec<Tree<A>>
 where
-    A: Clone + 'a,
-    F: Fn(A) -> bool + 'a,
+    F: Fn(A) -> bool,
 {
     xs.into_iter()
         .filter(|x| f(outcome(x.clone())))
@@ -200,10 +141,8 @@ where
         .collect()
 }
 
-pub fn map<'a, A, B, F>(f: Rc<F>, t: Tree<'a, A>) -> Tree<'a, B>
+pub fn map<A, B, F>(f: Rc<F>, t: Tree<A>) -> Tree<B>
 where
-    A: Clone + 'a,
-    B: Clone + 'a,
     F: Fn(A) -> B,
 {
     let x = f(t.value());
@@ -226,10 +165,7 @@ fn shift(head: &str, other: &str, lines: Vec<String>) -> Vec<String> {
     out
 }
 
-fn render_forest_lines<'a, A>(limit: i16, forest: &[Tree<'a, A>]) -> Vec<String>
-where
-    A: Debug + Clone,
-{
+fn render_forest_lines<A: Debug>(limit: i16, forest: &[Tree<A>]) -> Vec<String> {
     if limit <= 0 {
         return vec!["...".to_owned()];
     }
@@ -237,12 +173,12 @@ where
     match forest {
         [] => vec![],
         [x] => {
-            let s = render_tree_lines(limit - 1, x.as_ref());
+            let s = render_tree_lines(limit - 1, x);
             shift(" └╼", "   ", s)
         }
         xs0 => {
             let (x, xs) = xs0.split_at(1);
-            let s0 = render_tree_lines(limit - 1, x.first().unwrap().as_ref());
+            let s0 = render_tree_lines(limit - 1, x.first().unwrap());
             let ss = render_forest_lines(limit, xs);
 
             let mut s = shift(" ├╼", " │ ", s0);
@@ -253,10 +189,7 @@ where
     }
 }
 
-fn render_tree_lines<'a, A>(limit: i16, x: &Tree<'a, A>) -> Vec<String>
-where
-    A: Debug + Clone,
-{
+fn render_tree_lines<A: Debug>(limit: i16, x: &Tree<A>) -> Vec<String> {
     let mut children: Vec<String> = render_forest_lines(limit, &x.children);
     let node = format!(" {:?}", x.value());
 
@@ -264,7 +197,7 @@ where
     children
 }
 
-impl<'a, A> Display for Tree<'a, A>
+impl<A> Display for Tree<A>
 where
     A: Copy + Debug,
 {
@@ -279,19 +212,5 @@ where
         }
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rose_trees_hold_lazy_values() {
-        let n = 42;
-        let tree = Tree::singleton(n);
-        tree.value();
-        tree.value();
-        assert_eq!(tree.value(), n);
     }
 }

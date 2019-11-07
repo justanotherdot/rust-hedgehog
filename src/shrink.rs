@@ -5,9 +5,6 @@ use crate::tree;
 use crate::tree::Tree;
 use std::rc::Rc;
 
-// TODO: missing:
-//   * sequenceElems
-
 // This probably could be optimised for an eager language. by simply manipulating the vector
 // directly and doing the inner check, rather than returning the function here for use in a
 // pipeline a la the F# port.
@@ -27,7 +24,6 @@ where
     Box::new(cons_nub_do)
 }
 
-// TODO: This function could just be a loop.
 fn unfold<A, B, F>(f: F, b0: B) -> Vec<A>
 where
     F: Fn(B) -> Option<(A, B)>,
@@ -46,29 +42,24 @@ where
     acc
 }
 
-// We don't discriminate between LazyList and List
-// and we treat LazyList as Vec.
 pub fn removes<A, B>(k0: B, xs0: Vec<A>) -> Vec<Vec<A>>
 where
-    A: Clone,
     B: Integer + FromPrimitive + Copy,
 {
     fn loop0<C, D>(k: C, n: C, xs: Vec<D>) -> Vec<Vec<D>>
     where
         C: Integer + FromPrimitive + Copy,
-        D: Clone,
     {
-        let hd = &xs.clone().into_iter().take(1).collect::<Vec<_>>()[0];
-        let tl: Vec<_> = xs.clone().into_iter().skip(1).collect();
+        let hd = &xs.into_iter().take(1).collect::<Vec<_>>()[0];
+        let tl: Vec<_> = xs.into_iter().skip(1).collect();
         if k > n {
             vec![]
         } else if tl.is_empty() {
             vec![vec![]]
         } else {
-            let mut inner: Vec<_> = loop0(k, n - k, tl.clone())
+            let mut inner: Vec<_> = loop0(k, n - k, tl)
                 .into_iter()
-                .map(move |mut x| {
-                    let hd = hd.clone();
+                .map(|mut x| {
                     x.push(hd);
                     x
                 })
@@ -83,28 +74,27 @@ where
 
 pub fn elems<A, F>(shrink: Rc<F>, xs00: Vec<A>) -> Vec<Vec<A>>
 where
-    A: Clone,
     F: Fn(A) -> Vec<A>,
 {
     if xs00.is_empty() {
         vec![]
     } else {
-        let xs01 = xs00.clone().into_iter().take(1).collect::<Vec<_>>();
+        let xs01 = xs00.into_iter().take(1).collect::<Vec<_>>();
         let x0 = xs01.get(0).unwrap();
         let xs0: Vec<_> = xs00.into_iter().skip(1).collect();
-        let mut ys: Vec<_> = shrink(x0.clone())
+        let mut ys: Vec<_> = shrink(&x0)
             .into_iter()
             .map(|x1| {
                 let mut vs = vec![x1];
-                vs.append(&mut xs0.clone());
+                vs.append(&mut xs0);
                 vs
             })
             .collect();
         let mut zs: Vec<_> = elems(shrink.clone(), xs0)
             .into_iter()
             .map(|xs1| {
-                let mut vs = vec![x0.clone()];
-                vs.append(&mut xs1.clone());
+                let mut vs = vec![x0];
+                vs.append(&mut xs1);
                 vs
             })
             .collect();
@@ -148,7 +138,6 @@ where
     }
 }
 
-// TODO: rename to monomorphic variant.
 /// Shrink a floating-point number by edging towards a destination.
 /// Note we always try the destination first, as that is the optimal shrink.
 pub fn towards_float<'a, A: 'a>(destination: A, x: A) -> Vec<A>
@@ -173,40 +162,31 @@ where
 }
 
 // n.b. previously `list'
-pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>>
-where
-    A: Clone,
-{
+pub fn vec<A>(xs: Vec<A>) -> Vec<Vec<A>> {
     halves(xs.len())
         .into_iter()
-        .flat_map(move |k| {
-            let xs = xs.clone();
-            removes(k, xs)
-        })
+        .flat_map(move |k| removes(k, xs))
         .collect()
 }
 
-pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence<A, F>(
+    merge: Rc<F>,
+    xs: Box<dyn Iterator<Item = Tree<A>>>,
+) -> Tree<Box<dyn Iterator<Item = A>>>
 where
-    A: Clone + 'a,
-    // FIX: This is a bit silly because we don't have a LazyList type.
-    F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
+    F: Fn(
+        Box<dyn Iterator<Item = Tree<A>>>,
+    ) -> Box<dyn Iterator<Item = Box<dyn Iterator<Item = Tree<A>>>>>,
 {
-    let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
-    let ys = merge(xs)
-        .into_iter()
-        .map(|v| sequence(merge.clone(), v))
-        .collect();
+    let y = xs.map(|t| tree::outcome(&t));
+    let ys = Box::new(merge(xs).into_iter().map(|v| sequence(merge.clone(), v)));
     Tree::new(y, ys)
 }
 
-pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
-where
-    A: Clone + 'a,
-{
+pub fn sequence_list<A>(xs0: Vec<Tree<A>>) -> Tree<Vec<A>> {
     sequence(
-        Rc::new(move |xs: Vec<Tree<'a, A>>| {
-            let ys = xs.clone();
+        Rc::new(move |xs: Vec<Tree<A>>| {
+            let ys = xs;
             let mut shrinks = vec(xs);
             let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
             shrinks.append(&mut elems);
@@ -216,10 +196,7 @@ where
     )
 }
 
-pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
-where
-    A: Clone + 'a,
-{
+pub fn sequence_elems<A>(xs0: Vec<Tree<A>>) -> Tree<Vec<A>> {
     sequence(
         Rc::new(move |xs| elems(Rc::new(move |t| tree::shrinks(t)), xs)),
         xs0,
@@ -239,7 +216,6 @@ mod test {
     #[test]
     fn towards_float_works() {
         let f = |x| towards_float(100.0, x);
-
         let expected = vec![
             100.0,
             300.0,
