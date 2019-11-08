@@ -1,6 +1,7 @@
 extern crate num;
 
 use self::num::{Float, FromPrimitive, Integer};
+use crate::lazy::Lazy;
 use crate::tree;
 use crate::tree::Tree;
 use std::rc::Rc;
@@ -81,10 +82,10 @@ where
     loop0(k0, gen_len, xs0)
 }
 
-pub fn elems<A, F>(shrink: Rc<F>, xs00: Vec<A>) -> Vec<Vec<A>>
+pub fn elems<'a, A, F>(shrink: Rc<F>, xs00: Vec<Lazy<'a, A>>) -> Vec<Vec<A>>
 where
     A: Clone,
-    F: Fn(A) -> Vec<A>,
+    F: Fn(A) -> Vec<A> + 'a,
 {
     if xs00.is_empty() {
         vec![]
@@ -186,29 +187,34 @@ where
         .collect()
 }
 
-pub fn sequence<'a, A, F>(merge: Rc<F>, xs: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence<'a, A, F>(
+    merge: Rc<F>,
+    xs: Vec<Lazy<'a, Tree<'a, A>>>,
+) -> Lazy<'a, Tree<'a, Vec<A>>>
 where
     A: Clone + 'a,
     // FIX: This is a bit silly because we don't have a LazyList type.
     F: Fn(Vec<Tree<'a, A>>) -> Vec<Vec<Tree<'a, A>>>,
 {
-    let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
-    let ys = merge(xs)
-        .into_iter()
-        .map(|v| sequence(merge.clone(), v))
-        .collect();
-    Tree::new(y, ys)
+    Lazy::from_closure(|| {
+        let y = xs.clone().into_iter().map(|t| tree::outcome(t)).collect();
+        let ys = merge(xs)
+            .into_iter()
+            .map(|v| sequence(merge.clone(), v))
+            .collect();
+        Tree::new(y, ys)
+    })
 }
 
-pub fn sequence_list<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_list<'a, A>(xs0: Vec<Lazy<'a, Tree<'a, A>>>) -> Lazy<'a, Tree<'a, Vec<A>>>
 where
     A: Clone + 'a,
 {
     sequence(
-        Rc::new(move |xs: Vec<Tree<'a, A>>| {
+        Rc::new(move |xs: Vec<Lazy<'a, Tree<'a, A>>>| {
             let ys = xs.clone();
             let mut shrinks = vec(xs);
-            let mut elems = elems(Rc::new(move |t| tree::shrinks(t)), ys);
+            let mut elems = elems(Rc::new(|t| tree::shrinks(t)), ys);
             shrinks.append(&mut elems);
             shrinks
         }),
@@ -216,7 +222,7 @@ where
     )
 }
 
-pub fn sequence_elems<'a, A>(xs0: Vec<Tree<'a, A>>) -> Tree<'a, Vec<A>>
+pub fn sequence_elems<'a, A>(xs0: Vec<Lazy<'a, Tree<'a, A>>>) -> Tree<'a, Vec<A>>
 where
     A: Clone + 'a,
 {
